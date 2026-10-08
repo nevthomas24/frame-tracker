@@ -56,6 +56,8 @@
   html, body {
     height: 100%;
     margin: 0;
+    font-size: calc(16px * var(--fs, 1));
+    -webkit-text-size-adjust: 100%;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -80,14 +82,14 @@
     flex-wrap: wrap;
   }
   header h1 {
-    font-size: 17px;
+    font-size: calc(17px * var(--fs, 1));
     margin: 0;
     display: flex;
     align-items: center;
     gap: 8px;
   }
   header h1 .sub {
-    font-size: 12px;
+    font-size: calc(12px * var(--fs, 1));
     color: var(--text-dim);
     font-weight: 400;
   }
@@ -105,7 +107,7 @@
     color: var(--text);
     border-radius: 8px;
     padding: 8px 12px;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs, 1));
     transition: background .15s, border-color .15s;
   }
   button:hover { border-color: var(--accent-2); }
@@ -116,10 +118,20 @@
     font-weight: 600;
   }
   button.primary:hover { filter: brightness(1.08); }
+  .fs-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+  }
+  .fs-control button { border: none; background: transparent; border-radius: 999px; min-width: 34px; font-weight: 700; }
+  .fs-control #fsLabel { font-size: calc(11px * var(--fs, 1)); color: var(--text-dim); min-width: 36px; text-align: center; }
   .sync-status {
     background: transparent;
     cursor: pointer;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs, 1));
     padding: 5px 10px;
     border-radius: 999px;
     border: 1px solid var(--border);
@@ -137,7 +149,7 @@
   }
   button.sections-cta:hover { background: rgba(92,138,255,0.12); }
   button.ghost { background: transparent; }
-  button.small { padding: 5px 9px; font-size: 12px; }
+  button.small { padding: 5px 9px; font-size: calc(12px * var(--fs, 1)); }
   button.icon { padding: 6px 8px; line-height: 1; }
   input, select, textarea {
     font-family: inherit;
@@ -146,7 +158,7 @@
     color: var(--text);
     border-radius: 8px;
     padding: 8px 10px;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs, 1));
   }
   input:focus, select:focus, textarea:focus {
     outline: none;
@@ -188,7 +200,7 @@
     padding: 8px 10px;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs, 1));
     gap: 6px;
   }
   .char-item:hover { background: var(--bg-elev-2); }
@@ -197,14 +209,14 @@
     border: 1px solid var(--accent-2);
   }
   .char-item .cname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .char-item .count { color: var(--text-dim); font-size: 11px; }
+  .char-item .count { color: var(--text-dim); font-size: calc(11px * var(--fs, 1)); }
   .char-item .del-btn {
     opacity: 0.5;
     border: none;
     background: transparent;
     color: var(--text-dim);
     padding: 5px 8px;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs, 1));
     border-radius: 6px;
     flex-shrink: 0;
   }
@@ -215,7 +227,7 @@
   }
   .empty-hint {
     color: var(--text-dim);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs, 1));
     padding: 8px 2px;
     line-height: 1.5;
   }
@@ -249,7 +261,7 @@
   }
   .toolbar select { min-width: 120px; }
   .filter-label {
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     text-transform: uppercase;
     letter-spacing: .04em;
     color: var(--text-dim);
@@ -267,10 +279,10 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 10px 14px;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs, 1));
     color: var(--text-dim);
   }
-  .stat b { color: var(--text); font-size: 15px; display: block; }
+  .stat b { color: var(--text); font-size: calc(15px * var(--fs, 1)); display: block; }
   .table-wrap {
     overflow-x: auto;
     border: 1px solid var(--border);
@@ -281,7 +293,7 @@
     border-collapse: collapse;
     width: 100%;
     min-width: 900px;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs, 1));
   }
   thead th {
     text-align: left;
@@ -289,7 +301,7 @@
     border-bottom: 1px solid var(--border);
     color: var(--text-dim);
     font-weight: 600;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     text-transform: uppercase;
     letter-spacing: .03em;
     white-space: nowrap;
@@ -297,7 +309,7 @@
     user-select: none;
   }
   thead th:hover { color: var(--text); }
-  .sort-hint { opacity: 0.4; font-size: 9px; }
+  .sort-hint { opacity: 0.4; font-size: calc(9px * var(--fs, 1)); }
   thead th:hover .sort-hint { opacity: 0.9; }
   tbody td {
     padding: 9px 10px;
@@ -315,9 +327,9 @@
     line-height: 1.4;
   }
   .notes-clamp.open { display: block; -webkit-line-clamp: unset; }
-  .paste-preview td, .paste-preview th { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
+  .paste-preview td, .paste-preview th { font-size: calc(12px * var(--fs, 1)); padding: 6px 8px; white-space: nowrap; }
   .finder-group { margin-top: 14px; }
-  .finder-group h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); margin: 0 0 6px; }
+  .finder-group h3 { font-size: calc(12px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); margin: 0 0 6px; }
   .finder-row {
     display: grid;
     grid-template-columns: minmax(70px, 1.2fr) 1fr 0.7fr 1fr;
@@ -328,17 +340,17 @@
     border-radius: 8px;
     margin-bottom: 6px;
     background: var(--bg-elev-2);
-    font-size: 13px;
+    font-size: calc(13px * var(--fs, 1));
   }
   .finder-row.best { border-color: var(--good); }
-  .finder-row .lbl { display: block; font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .03em; }
-  .finder-head { font-size: 14px; margin: 12px 0 4px; }
+  .finder-row .lbl { display: block; font-size: calc(10px * var(--fs, 1)); color: var(--text-dim); text-transform: uppercase; letter-spacing: .03em; }
+  .finder-head { font-size: calc(14px * var(--fs, 1)); margin: 12px 0 4px; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: var(--bg-elev-2); }
   .notation { font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
   .tag {
     display: inline-block;
-    font-size: 10px;
+    font-size: calc(10px * var(--fs, 1));
     padding: 2px 6px;
     border-radius: 999px;
     background: var(--bg-elev-2);
@@ -356,9 +368,10 @@
     font-weight: 700;
     font-family: "SF Mono", Menlo, Consolas, monospace;
   }
-  .frame-good { background: rgba(62,207,106,0.15); color: var(--good); }
-  .frame-mid  { background: rgba(230,184,0,0.15); color: var(--mid); }
-  .frame-bad  { background: rgba(255,92,92,0.15); color: var(--bad); }
+  .fv-plus   { background: rgba(62,207,106,0.16); color: var(--good); }
+  .fv-zero   { background: rgba(154,160,171,0.16); color: var(--text-dim); }
+  .fv-minus  { background: rgba(255,92,92,0.14); color: var(--bad); }
+  .fv-punish { background: var(--bad); color: #fff; }
   .level-pill {
     display: inline-block;
     min-width: 22px;
@@ -366,7 +379,7 @@
     padding: 2px 6px;
     border-radius: 6px;
     font-weight: 700;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     font-family: "SF Mono", Menlo, Consolas, monospace;
   }
   .level-high { background: rgba(230,184,0,0.15); color: var(--mid); }
@@ -380,7 +393,7 @@
     padding: 60px 20px;
     color: var(--text-dim);
   }
-  .empty-state .big { font-size: 32px; margin-bottom: 10px; }
+  .empty-state .big { font-size: calc(32px * var(--fs, 1)); margin-bottom: 10px; }
   /* Modal */
   .overlay {
     position: fixed;
@@ -403,7 +416,7 @@
     max-width: 560px;
     padding: 20px;
   }
-  .modal h2 { margin: 0 0 14px; font-size: 16px; }
+  .modal h2 { margin: 0 0 14px; font-size: calc(16px * var(--fs, 1)); }
   .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -411,7 +424,7 @@
   }
   .modal-subhead {
     grid-column: 1 / -1;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     text-transform: uppercase;
     letter-spacing: .04em;
     font-weight: 700;
@@ -424,7 +437,7 @@
   .form-grid .full { grid-column: 1 / -1; }
   .field label {
     display: block;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     color: var(--text-dim);
     margin-bottom: 4px;
     text-transform: uppercase;
@@ -439,7 +452,7 @@
     margin-top: 4px;
   }
   .tag-choice {
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     padding: 5px 9px;
     border-radius: 999px;
     border: 1px solid var(--border);
@@ -461,7 +474,7 @@
     min-height: 30px;
     padding: 4px 2px;
   }
-  .level-seq .placeholder { color: var(--text-dim); font-size: 12px; }
+  .level-seq .placeholder { color: var(--text-dim); font-size: calc(12px * var(--fs, 1)); }
   .level-chip {
     display: inline-flex;
     align-items: center;
@@ -475,12 +488,12 @@
     border: none;
     background: transparent;
     color: var(--text-dim);
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     padding: 2px 4px;
     line-height: 1;
   }
   .level-chip-del:hover { color: var(--bad); }
-  .level-arrow { color: var(--text-dim); font-size: 12px; }
+  .level-arrow { color: var(--text-dim); font-size: calc(12px * var(--fs, 1)); }
   .modal-actions {
     display: flex;
     justify-content: space-between;
@@ -489,7 +502,7 @@
   }
   .modal-actions .right { display: flex; gap: 8px; }
   .hint {
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     color: var(--text-dim);
     margin-top: -4px;
     margin-bottom: 8px;
@@ -497,7 +510,7 @@
   tr.section-row td {
     background: var(--bg-elev-2);
     font-weight: 700;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs, 1));
     text-transform: uppercase;
     letter-spacing: .04em;
     color: var(--accent-2);
@@ -511,13 +524,13 @@
     text-transform: none;
     letter-spacing: 0;
     margin-left: 6px;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
   }
   tr.section-row .caret { display: inline-block; width: 12px; }
   tr.subsection-row td {
     background: var(--bg-elev);
     font-weight: 600;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     text-transform: uppercase;
     letter-spacing: .03em;
     color: var(--text-dim);
@@ -532,7 +545,7 @@
     text-transform: none;
     letter-spacing: 0;
     margin-left: 6px;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
   }
   tr.subsection-row .caret { display: inline-block; width: 12px; }
   .section-row-flex {
@@ -545,7 +558,7 @@
     text-transform: none;
     letter-spacing: 0;
     font-weight: 600;
-    font-size: 11px;
+    font-size: calc(11px * var(--fs, 1));
     padding: 4px 10px;
     color: var(--text);
     background: var(--bg-elev);
@@ -605,13 +618,13 @@
     border-radius: 6px;
     padding: 4px 6px;
   }
-  .subsec-row input { flex: 1; min-width: 0; font-size: 12px; padding: 5px 7px; }
+  .subsec-row input { flex: 1; min-width: 0; font-size: calc(12px * var(--fs, 1)); padding: 5px 7px; }
   .add-subsection-row {
     display: flex;
     gap: 6px;
     margin-left: 22px;
   }
-  .add-subsection-row input { flex: 1; font-size: 12px; padding: 6px 8px; }
+  .add-subsection-row input { flex: 1; font-size: calc(12px * var(--fs, 1)); padding: 6px 8px; }
   .add-section-row { display: flex; gap: 6px; margin-bottom: 14px; }
   .add-section-row input { flex: 1; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -631,9 +644,14 @@
 <body>
 
 <header>
-  <h1>🥋 Tekken 8 Frame Data Tracker <span class="sub">your personal movelist notebook</span></h1>
+  <h1>🥋 Tekken 8 Frame Data Tracker <span class="sub" id="appVersion"></span></h1>
   <div class="header-actions">
     <button type="button" class="sync-status" id="syncStatus" data-state="local" title="Sync settings">⚙️ Set up sync</button>
+    <span class="fs-control" role="group" aria-label="Text size">
+      <button type="button" class="small" id="fsDown" title="Smaller text">A−</button>
+      <span id="fsLabel">100%</span>
+      <button type="button" class="small" id="fsUp" title="Bigger text">A+</button>
+    </span>
     <button class="icon ghost" id="themeToggle" title="Toggle theme">🌓</button>
     <button class="small" id="exportBtn">Export JSON</button>
     <button class="small" id="importBtn">Import JSON</button>
@@ -773,13 +791,13 @@
 <div class="overlay" id="syncOverlay">
   <div class="modal">
     <h2>Sync between devices</h2>
-    <div class="hint" style="margin-top:0;font-size:12px;line-height:1.6">
+    <div class="hint" style="margin-top:0;font-size: calc(12px * var(--fs, 1));line-height:1.6">
       This app always saves on this device first, so it works with no internet. To also keep your iPad,
       phone and computer in step, it stores a copy in a <b>private gist</b> on your GitHub account and syncs
       whenever you're online.
     </div>
-    <div id="syncConnectedNote" class="hint" style="display:none;color:var(--good);font-size:12px">✓ Sync is on for this device. Paste a new token below only if you want to replace it.</div>
-    <ol style="font-size:13px;line-height:1.7;padding-left:20px;margin:10px 0 14px">
+    <div id="syncConnectedNote" class="hint" style="display:none;color:var(--good);font-size: calc(12px * var(--fs, 1))">✓ Sync is on for this device. Paste a new token below only if you want to replace it.</div>
+    <ol style="font-size: calc(13px * var(--fs, 1));line-height:1.7;padding-left:20px;margin:10px 0 14px">
       <li><a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Tekken%20Frame%20Tracker" target="_blank" rel="noopener" style="color:var(--accent-2)">Open GitHub's token page</a> (sign in if asked).</li>
       <li>Set <b>Expiration</b> to "No expiration" (or a long date). Leave only <b>gist</b> ticked.</li>
       <li>Tap <b>Generate token</b>, copy it, and paste it here.</li>
@@ -800,7 +818,7 @@
 <div class="overlay" id="pasteOverlay">
   <div class="modal" style="max-width:760px">
     <h2>Paste a table from the wiki</h2>
-    <div class="hint" style="margin-top:0;font-size:12px;line-height:1.6">
+    <div class="hint" style="margin-top:0;font-size: calc(12px * var(--fs, 1));line-height:1.6">
       On the wiki page, select the whole table <b>including its header row</b> (e.g. Enemy · Move · Damage · Frames), copy it, then paste below.
       Works for punisher tables and move lists. You'll see a preview before anything is added.
     </div>
@@ -834,8 +852,8 @@
 <div class="overlay" id="finderOverlay">
   <div class="modal">
     <h2>🎯 Punish finder</h2>
-    <div class="hint" style="margin-top:0;font-size:12px">How unsafe is the opponent's move on block? Shows your logged moves fast enough to punish it, biggest damage first.</div>
-    <input id="finderInput" inputmode="text" placeholder="e.g. -13" autocomplete="off" style="width:100%;font-size:18px;margin-top:4px">
+    <div class="hint" style="margin-top:0;font-size: calc(12px * var(--fs, 1))">How unsafe is the opponent's move on block? Shows your logged moves fast enough to punish it, biggest damage first.</div>
+    <input id="finderInput" inputmode="text" placeholder="e.g. -13" autocomplete="off" style="width:100%;font-size: calc(18px * var(--fs, 1));margin-top:4px">
     <div class="tag-picker" id="finderQuick" style="margin-top:8px"></div>
     <div id="finderResults"></div>
     <div class="modal-actions">
@@ -847,7 +865,7 @@
 
 <div class="overlay" id="confirmOverlay">
   <div class="modal" style="max-width:380px">
-    <p id="confirmMessage" style="margin:0 0 18px;font-size:14px;line-height:1.5"></p>
+    <p id="confirmMessage" style="margin:0 0 18px;font-size: calc(14px * var(--fs, 1));line-height:1.5"></p>
     <div class="modal-actions">
       <button class="ghost" id="confirmCancelBtn">Cancel</button>
       <button class="primary" id="confirmOkBtn" style="background:var(--bad);border-color:var(--bad);color:#fff">Delete</button>
@@ -1259,12 +1277,19 @@ function punishDamage(s) {
   const combo = t.match(/\(\s*(\d+)/);
   return combo ? parseInt(combo[1], 10) : damageTotal(s);
 }
-function blockClass(blockStr) {
-  const val = parseFrame(blockStr);
+// plus = green, 0 = grey, minus = red; -10 or worse (punishable) = solid red
+function frameClass(str, solidWhenPunishable) {
+  const val = parseFrame(str);
   if (val === null) return '';
-  if (val >= 0) return 'frame-good';
-  if (val <= -10) return 'frame-bad';
-  return 'frame-mid';
+  if (val > 0) return 'fv-plus';
+  if (val === 0) return 'fv-zero';
+  if (solidWhenPunishable && val <= -10) return 'fv-punish';
+  return 'fv-minus';
+}
+function blockClass(blockStr) { return frameClass(blockStr, true); }
+function framePill(str, solid) {
+  const cls = frameClass(str, solid);
+  return cls ? `<span class="frame-pill ${cls}">${escapeHtml(str)}</span>` : escapeHtml(str || '—');
 }
 
 function renderSidebar() {
@@ -1470,9 +1495,9 @@ function renderMain() {
       case 'level': return `<td>${levelSeqBadges(m.levels)}</td>`;
       case 'damage': return `<td>${escapeHtml(m.damage||'—')}</td>`;
       case 'startup': return `<td>${escapeHtml(m.startup||'—')}</td>`;
-      case 'block': return `<td><span class="frame-pill ${blockClass(m.block)}">${escapeHtml(m.block||'—')}</span></td>`;
-      case 'hit': return `<td>${escapeHtml(m.hit||'—')}</td>`;
-      case 'ch': return `<td>${escapeHtml(m.ch||'—')}</td>`;
+      case 'block': return `<td>${framePill(m.block, true)}</td>`;
+      case 'hit': return `<td>${framePill(m.hit, false)}</td>`;
+      case 'ch': return `<td>${framePill(m.ch, false)}</td>`;
       case 'tags': return `<td class="wrap">${(m.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</td>`;
       case 'combo': {
         const text = [m.combo, m.punish, m.notes].filter(Boolean).join(' · ');
@@ -2031,7 +2056,7 @@ function renderColumnsList() {
     row.innerHTML = `
       <button class="small icon up-btn" ${i===0?'disabled':''}>↑</button>
       <button class="small icon down-btn" ${i===order.length-1?'disabled':''}>↓</button>
-      <span style="flex:1;font-size:13px">${escapeHtml(COLUMN_DEFS[key] || key)}</span>
+      <span style="flex:1;font-size: calc(13px * var(--fs, 1))">${escapeHtml(COLUMN_DEFS[key] || key)}</span>
     `;
     row.querySelector('.up-btn').addEventListener('click', () => {
       if (i === 0) return;
@@ -2048,7 +2073,7 @@ function renderColumnsList() {
   const actionsRow = document.createElement('div');
   actionsRow.className = 'sec-row';
   actionsRow.style.opacity = '0.5';
-  actionsRow.innerHTML = `<span style="flex:1;font-size:13px;margin-left:56px">Actions (always last)</span>`;
+  actionsRow.innerHTML = `<span style="flex:1;font-size: calc(13px * var(--fs, 1));margin-left:56px">Actions (always last)</span>`;
   list.appendChild(actionsRow);
 }
 document.getElementById('manageColumnsBtn').addEventListener('click', () => {
@@ -2372,7 +2397,7 @@ function renderFinder() {
   let html = `<div class="finder-head">Opponent at <b>${-need}</b>: you have <b>${need}</b> frames.</div>`;
   if (!fits.length) {
     const fastest = withStartup.map(startupOf).sort((a, b) => a - b)[0];
-    html += `<div class="hint" style="font-size:13px;margin-top:8px">Nothing logged for ${escapeHtml(currentChar)} is fast enough.` +
+    html += `<div class="hint" style="font-size: calc(13px * var(--fs, 1));margin-top:8px">Nothing logged for ${escapeHtml(currentChar)} is fast enough.` +
       (fastest ? ` Your fastest logged move is i${fastest}.` : '') + '</div>';
   }
   html += group('Standing punishes', standing);
@@ -2398,6 +2423,35 @@ document.getElementById('finderQuick').addEventListener('click', (e) => {
 document.getElementById('finderInput').addEventListener('input', renderFinder);
 document.getElementById('finderClose').addEventListener('click', () => document.getElementById('finderOverlay').classList.remove('show'));
 document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
+
+/* ---------- Text size (saved per device: phone and iPad can differ) ---------- */
+const APP_VERSION = 'v3 · 8 Oct';
+const FS_KEY = 'tekken8-font-scale';
+const FS_STEPS = [0.9, 1, 1.15, 1.3, 1.45, 1.6];
+function applyFontScale(v) {
+  document.documentElement.style.setProperty('--fs', String(v));
+  document.getElementById('fsLabel').textContent = Math.round(v * 100) + '%';
+  document.getElementById('fsDown').disabled = v <= FS_STEPS[0];
+  document.getElementById('fsUp').disabled = v >= FS_STEPS[FS_STEPS.length - 1];
+}
+function currentFontScale() {
+  let saved = null;
+  try { saved = parseFloat(localStorage.getItem(FS_KEY)); } catch (e) {}
+  if (FS_STEPS.includes(saved)) return saved;
+  // touch screens start a step bigger
+  return window.matchMedia && window.matchMedia('(pointer: coarse)').matches ? 1.15 : 1;
+}
+function stepFontScale(dir) {
+  const cur = currentFontScale();
+  const i = FS_STEPS.indexOf(cur);
+  const next = FS_STEPS[Math.min(FS_STEPS.length - 1, Math.max(0, i + dir))];
+  try { localStorage.setItem(FS_KEY, String(next)); } catch (e) {}
+  applyFontScale(next);
+}
+document.getElementById('fsDown').addEventListener('click', () => stepFontScale(-1));
+document.getElementById('fsUp').addEventListener('click', () => stepFontScale(1));
+applyFontScale(currentFontScale());
+document.getElementById('appVersion').textContent = APP_VERSION;
 
 // Init
 load();
