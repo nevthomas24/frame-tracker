@@ -305,7 +305,34 @@
     vertical-align: top;
     white-space: nowrap;
   }
-  tbody td.wrap { white-space: normal; max-width: 220px; }
+  tbody td.wrap { white-space: normal; max-width: 260px; }
+  .notes-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .notes-clamp.open { display: block; -webkit-line-clamp: unset; }
+  .paste-preview td, .paste-preview th { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
+  .finder-group { margin-top: 14px; }
+  .finder-group h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); margin: 0 0 6px; }
+  .finder-row {
+    display: grid;
+    grid-template-columns: minmax(70px, 1.2fr) 1fr 0.7fr 1fr;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    background: var(--bg-elev-2);
+    font-size: 13px;
+  }
+  .finder-row.best { border-color: var(--good); }
+  .finder-row .lbl { display: block; font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .03em; }
+  .finder-head { font-size: 14px; margin: 12px 0 4px; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: var(--bg-elev-2); }
   .notation { font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
@@ -629,6 +656,8 @@
       <input type="text" id="searchInput" placeholder="🔍 Search notation, name, notes…">
       <button id="manageSectionsBtn" class="sections-cta">✏️ Add / Edit Sections</button>
       <button id="manageColumnsBtn" class="sections-cta">↔ Reorder Columns</button>
+      <button id="pasteTableBtn" class="sections-cta">📋 Paste from wiki</button>
+      <button id="finderBtn" class="sections-cta">🎯 Punish finder</button>
       <button class="primary" id="addMoveBtn">+ Add Move</button>
     </div>
     <div class="toolbar" id="toolbar" style="display:none">
@@ -764,6 +793,54 @@
         <button id="syncNowBtn">Sync now</button>
         <button class="primary" id="connectBtn">Connect</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pasteOverlay">
+  <div class="modal" style="max-width:760px">
+    <h2>Paste a table from the wiki</h2>
+    <div class="hint" style="margin-top:0;font-size:12px;line-height:1.6">
+      On the wiki page, select the whole table <b>including its header row</b> (e.g. Enemy · Move · Damage · Frames), copy it, then paste below.
+      Works for punisher tables and move lists. You'll see a preview before anything is added.
+    </div>
+    <textarea id="pasteBox" rows="4" placeholder="Tap here and paste…" style="width:100%"></textarea>
+    <div id="pasteMsg" class="hint" style="margin-top:8px"></div>
+    <div id="pasteOptions" style="display:none">
+      <div class="form-grid" style="margin-top:6px">
+        <div class="field"><label>Add to section</label>
+          <select id="pasteSection"></select>
+          <input id="pasteNewSection" placeholder="New section name" style="display:none;margin-top:6px">
+        </div>
+        <div class="field"><label>Subsections</label>
+          <select id="pasteGroup">
+            <option value="table">By table title (e.g. Standing, Crouching)</option>
+            <option value="enemy">By enemy frames (e.g. -10, -12)</option>
+            <option value="none">No subsections</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height:280px;overflow:auto;margin-top:10px">
+        <table class="paste-preview" id="pastePreview" style="min-width:0"></table>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="ghost" id="pasteCancel">Cancel</button>
+      <div class="right"><button class="primary" id="pasteImport" disabled>Add moves</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="finderOverlay">
+  <div class="modal">
+    <h2>🎯 Punish finder</h2>
+    <div class="hint" style="margin-top:0;font-size:12px">How unsafe is the opponent's move on block? Shows your logged moves fast enough to punish it, biggest damage first.</div>
+    <input id="finderInput" inputmode="text" placeholder="e.g. -13" autocomplete="off" style="width:100%;font-size:18px;margin-top:4px">
+    <div class="tag-picker" id="finderQuick" style="margin-top:8px"></div>
+    <div id="finderResults"></div>
+    <div class="modal-actions">
+      <button class="ghost" id="finderClose">Close</button>
+      <div></div>
     </div>
   </div>
 </div>
@@ -1152,13 +1229,39 @@ function levelSeqBadges(levels) {
   return levels.map(l => levelBadge(l)).join('<span class="level-arrow">›</span>');
 }
 
+// Frame values come in many shapes: "-9", "+3", "−14" (typographic minus from wikis),
+// "+21a (+12)", "-10~-9", "i15", "i10~12". This returns the first signed number, or null.
+function normalizeText(s) {
+  return String(s ?? '')
+    .replace(/\[\d+\]/g, '')                       // wiki footnote markers like [1]
+    .replace(/[−‒–—﹣－]/g, '-'); // every dash/minus look-alike → "-"
+}
+function parseFrame(s) {
+  const m = normalizeText(s).match(/([+-]?)\s*(\d+)/);
+  if (!m) return null;
+  return (m[1] === '-' ? -1 : 1) * parseInt(m[2], 10);
+}
+function startupOf(m) {
+  const v = parseFrame(m.startup);
+  return v === null ? null : Math.abs(v);
+}
+// "10, 10" → 20 (multi-hit); "31 (76 (41))" → 31 (bracketed parts are combo damage, not the hit)
+function damageTotal(s) {
+  let t = normalizeText(s);
+  let prev;
+  do { prev = t; t = t.replace(/\([^()]*\)/g, ''); } while (t !== prev);
+  const nums = t.match(/\d+/g);
+  return nums ? nums.reduce((a, n) => a + parseInt(n, 10), 0) : null;
+}
+// for ranking punishes: the follow-up combo damage when listed, e.g. 76 in "31 (76 (41))"
+function punishDamage(s) {
+  const t = normalizeText(s);
+  const combo = t.match(/\(\s*(\d+)/);
+  return combo ? parseInt(combo[1], 10) : damageTotal(s);
+}
 function blockClass(blockStr) {
-  if (!blockStr) return '';
-  const m = String(blockStr).match(/-?\d+/);
-  if (!m) return '';
-  const n = parseInt(m[0], 10);
-  if (String(blockStr).trim().startsWith('-') === false && n >= 0) return 'frame-good';
-  const val = String(blockStr).includes('-') ? -Math.abs(n) : n;
+  const val = parseFrame(blockStr);
+  if (val === null) return '';
   if (val >= 0) return 'frame-good';
   if (val <= -10) return 'frame-bad';
   return 'frame-mid';
@@ -1238,16 +1341,8 @@ function renderStats() {
   if (!currentChar || moves.length === 0) { statRow.style.display = 'none'; return; }
   statRow.style.display = 'flex';
   const launchers = moves.filter(m => (m.tags||[]).includes('Launcher')).length;
-  const punishable = moves.filter(m => {
-    const mm = String(m.block||'').match(/-?\d+/);
-    return mm && (String(m.block).includes('-') ? -Math.abs(parseInt(mm[0])) : parseInt(mm[0])) <= -10;
-  }).length;
-  const plusOnBlock = moves.filter(m => {
-    const mm = String(m.block||'').match(/-?\d+/);
-    if (!mm) return false;
-    const isNeg = String(m.block).trim().startsWith('-');
-    return !isNeg;
-  }).length;
+  const punishable = moves.filter(m => { const v = parseFrame(m.block); return v !== null && v <= -10; }).length;
+  const plusOnBlock = moves.filter(m => { const v = parseFrame(m.block); return v !== null && v >= 0; }).length;
   statRow.innerHTML = `
     <div class="stat"><b>${moves.length}</b>Total moves logged</div>
     <div class="stat"><b>${launchers}</b>Launchers</div>
@@ -1306,10 +1401,8 @@ function renderMain() {
   }
   if (punishF) {
     moves = moves.filter(m => {
-      const mm = String(m.block||'').match(/-?\d+/);
-      if (!mm) return false;
-      const isNeg = String(m.block).trim().startsWith('-');
-      const val = isNeg ? -Math.abs(parseInt(mm[0])) : parseInt(mm[0]);
+      const val = parseFrame(m.block);
+      if (val === null) return false;
       if (punishF === 'plus') return val >= 0;
       if (punishF === 'minor') return val < 0 && val > -10;
       if (punishF === 'punishable') return val <= -10;
@@ -1326,12 +1419,15 @@ function renderMain() {
         return ((ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)) * sortDir;
       }
       let av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
-      if (sortKey === 'block' || sortKey === 'hit') {
-        const an = parseInt(String(av).match(/-?\d+/)?.[0] ?? '0', 10) * (String(av).trim().startsWith('-') ? -1 : 1);
-        const bn = parseInt(String(bv).match(/-?\d+/)?.[0] ?? '0', 10) * (String(bv).trim().startsWith('-') ? -1 : 1);
+      const numeric = { block: parseFrame, hit: parseFrame, ch: parseFrame, startup: parseFrame, damage: damageTotal }[sortKey];
+      if (numeric) {
+        const an = numeric(av), bn = numeric(bv);
+        if (an === null && bn === null) return 0;
+        if (an === null) return 1;   // blanks always sink to the bottom
+        if (bn === null) return -1;
         return (an - bn) * sortDir;
       }
-      return String(av).localeCompare(String(bv)) * sortDir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * sortDir;
     });
   }
 
@@ -1378,7 +1474,10 @@ function renderMain() {
       case 'hit': return `<td>${escapeHtml(m.hit||'—')}</td>`;
       case 'ch': return `<td>${escapeHtml(m.ch||'—')}</td>`;
       case 'tags': return `<td class="wrap">${(m.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</td>`;
-      case 'combo': return `<td class="wrap">${escapeHtml([m.combo, m.punish, m.notes].filter(Boolean).join(' · ')) || '—'}</td>`;
+      case 'combo': {
+        const text = [m.combo, m.punish, m.notes].filter(Boolean).join(' · ');
+        return text ? `<td class="wrap"><div class="notes-clamp" title="Tap to expand">${escapeHtml(text)}</div></td>` : `<td class="wrap">—</td>`;
+      }
       default: return `<td>—</td>`;
     }
   };
@@ -1491,6 +1590,9 @@ function renderMain() {
       if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
       renderMain();
     });
+  });
+  area.querySelectorAll('.notes-clamp').forEach(el => {
+    el.addEventListener('click', () => el.classList.toggle('open'));
   });
   area.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -2039,6 +2141,264 @@ document.getElementById('importFile').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+/* ---------- Paste from wiki ----------
+   Reads a copied web table (HTML when the clipboard has it, tab-separated text otherwise),
+   matches columns by their header names, and turns each row into a move. Merged cells
+   (like the "Enemy -10" cell spanning two rows) are carried down to every row they cover. */
+const paste = { html: '', parsed: [] };
+const HEADER_MAP = [
+  [/^(enemy|vs\.?|opponent|punishes)\b/, 'enemy'],
+  [/^(move|command|input|notation|string)\b/, 'notation'],
+  [/^name\b/, 'name'],
+  [/^(hit ?level|level|hl|hit lvl|lvl)\b/, 'levels'],
+  [/^(damage|dmg)\b/, 'damage'],
+  [/^(startup|start|speed|impact)\b/, 'startup'],
+  [/^(on ?block|block|blk)\b/, 'block'],
+  [/^(on ?ch|ch|counter)\b/, 'ch'],
+  [/^(on ?hit|hit|frames?|adv)\b/, 'hit'],
+  [/^(notes?|comments?|properties|remarks)\b/, 'notes'],
+];
+function cleanCell(s) { return normalizeText(s).replace(/\s+/g, ' ').trim(); }
+function headerKey(cell) {
+  const t = cleanCell(cell).toLowerCase();
+  if (!t || t.length > 24) return null;
+  for (const [re, key] of HEADER_MAP) if (re.test(t)) return key;
+  return null;
+}
+function tableToGrid(table) {
+  const grid = [];
+  const spans = [];
+  const cap = table.caption ? cleanCell(table.caption.textContent) : '';
+  if (cap) grid.push({ cells: [cap], title: true });
+  Array.from(table.rows).forEach(tr => {
+    const cells = Array.from(tr.cells);
+    const row = [];
+    let col = 0, ci = 0;
+    while (ci < cells.length || (spans[col] && spans[col].left > 0)) {
+      if (spans[col] && spans[col].left > 0) { row[col] = spans[col].text; spans[col].left--; col++; continue; }
+      const c = cells[ci++];
+      const t = cleanCell(c.textContent);
+      const cs = Math.max(1, c.colSpan || 1), rs = Math.max(1, c.rowSpan || 1);
+      for (let k = 0; k < cs; k++) { row[col] = t; if (rs > 1) spans[col] = { left: rs - 1, text: t }; col++; }
+    }
+    const single = cells.length === 1 && (cells[0].colSpan || 1) > 1;
+    grid.push({ cells: row, title: single });
+  });
+  return grid;
+}
+function textToGrid(text) {
+  return text.split(/\r?\n/).map(line => {
+    const cells = line.split('\t');
+    const nonEmpty = cells.map(cleanCell).filter(Boolean);
+    return { cells, title: nonEmpty.length === 1 && cells.length <= 2, text: true };
+  });
+}
+function gridToRows(grid) {
+  let keys = null, title = '', lastEnemy = '';
+  const out = [];
+  for (const r of grid) {
+    const cells = r.cells.map(cleanCell);
+    const nonEmpty = cells.filter(Boolean);
+    if (!nonEmpty.length) continue;
+    if (r.title) { title = nonEmpty[0]; continue; }
+    const mapped = cells.map(headerKey);
+    if (mapped.includes('notation') && mapped.filter(Boolean).length >= 2) { keys = mapped; continue; }
+    if (!keys) continue;
+    let row = cells;
+    // in copied text a merged "Enemy" cell only appears on its first row: carry it down
+    if (r.text && keys[0] === 'enemy' && row.length < keys.length) row = [lastEnemy, ...row];
+    const p = {};
+    keys.forEach((k, i) => { if (k && row[i]) p[k] = row[i]; });
+    if (p.enemy) lastEnemy = p.enemy;
+    if (!p.notation) continue;
+    p.title = title;
+    out.push(p);
+  }
+  return out;
+}
+function parseLevels(s) {
+  const t = cleanCell(s).toLowerCase();
+  if (!t) return [];
+  let parts = t.split(/[\s,\/|>›]+/).filter(Boolean);
+  if (parts.length === 1 && /^[hml]{2,}$/.test(parts[0])) parts = parts[0].split('');
+  const map = { h: 'High', high: 'High', m: 'Mid', mid: 'Mid', l: 'Low', low: 'Low', sm: 'Special Mid', s: 'Special Mid', 'special': 'Special Mid', '!': 'Unblockable', ub: 'Unblockable', unblockable: 'Unblockable' };
+  return parts.map(x => map[x] || map[x.replace(/[^a-z!]/g, '')]).filter(Boolean);
+}
+function parsePasted() {
+  const text = document.getElementById('pasteBox').value;
+  let grid = [];
+  if (paste.html && /<table/i.test(paste.html)) {
+    const doc = new DOMParser().parseFromString(paste.html, 'text/html');
+    doc.querySelectorAll('table').forEach(t => { grid = grid.concat(tableToGrid(t)); });
+  } else if (text.trim()) {
+    grid = textToGrid(text);
+  }
+  paste.parsed = gridToRows(grid);
+  renderPastePreview();
+}
+function pasteTargets(p) {
+  const group = document.getElementById('pasteGroup').value;
+  const sub = group === 'table' ? (p.title || '') : group === 'enemy' ? (p.enemy || '') : '';
+  return sub;
+}
+function renderPastePreview() {
+  const msg = document.getElementById('pasteMsg');
+  const opts = document.getElementById('pasteOptions');
+  const btn = document.getElementById('pasteImport');
+  const rows = paste.parsed;
+  if (!rows.length) {
+    const hasText = document.getElementById('pasteBox').value.trim() || paste.html;
+    msg.textContent = hasText ? 'Couldn\'t find a header row with a "Move" (or "Command") column. Copy again and include the header row.' : '';
+    opts.style.display = 'none';
+    btn.disabled = true;
+    return;
+  }
+  const hasTitles = rows.some(r => r.title), hasEnemy = rows.some(r => r.enemy);
+  const groupSel = document.getElementById('pasteGroup');
+  if (!paste.groupTouched) groupSel.value = hasTitles ? 'table' : hasEnemy ? 'enemy' : 'none';
+  msg.textContent = `Found ${rows.length} move${rows.length === 1 ? '' : 's'}.` + (hasEnemy ? ' Startup is set from the Enemy column (a −12 punish is a 12-frame move) where the table has no startup column.' : '');
+  opts.style.display = 'block';
+  btn.disabled = false;
+  const cols = ['notation', 'levels', 'damage', 'startup', 'block', 'hit', 'ch', 'enemy'].filter(k => rows.some(r => r[k]));
+  const label = { notation: 'Move', levels: 'Level', damage: 'Dmg', startup: 'Start', block: 'Block', hit: 'Hit', ch: 'CH', enemy: 'Enemy' };
+  let html = '<thead><tr><th>Subsection</th>' + cols.map(c => `<th>${label[c]}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += `<tr><td>${escapeHtml(pasteTargets(r) || '—')}</td>` + cols.map(c => `<td>${escapeHtml(r[c] || '—')}</td>`).join('') + '</tr>';
+  });
+  document.getElementById('pastePreview').innerHTML = html + '</tbody>';
+}
+function openPaste() {
+  if (!currentChar) return;
+  paste.html = ''; paste.parsed = []; paste.groupTouched = false;
+  document.getElementById('pasteBox').value = '';
+  document.getElementById('pasteMsg').textContent = '';
+  document.getElementById('pasteOptions').style.display = 'none';
+  document.getElementById('pasteImport').disabled = true;
+  const sel = document.getElementById('pasteSection');
+  const secs = state.characters[currentChar].sections || [];
+  const c = state.characters[currentChar];
+  const guess = secs.find(s => s.name === c.lastPasteSection) || secs.find(s => /punish/i.test(s.name));
+  sel.innerHTML = secs.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('') +
+    '<option value="__new">+ New section…</option>';
+  sel.value = guess ? guess.name : (secs[0] ? secs[0].name : '__new');
+  const nw = document.getElementById('pasteNewSection');
+  nw.value = guess || secs.length ? '' : 'Punishers';
+  nw.style.display = sel.value === '__new' ? 'block' : 'none';
+  document.getElementById('pasteOverlay').classList.add('show');
+}
+document.getElementById('pasteTableBtn').addEventListener('click', openPaste);
+document.getElementById('pasteBox').addEventListener('paste', (e) => {
+  const html = e.clipboardData && e.clipboardData.getData('text/html');
+  if (html && /<table/i.test(html)) {
+    e.preventDefault();
+    paste.html = html;
+    document.getElementById('pasteBox').value = e.clipboardData.getData('text/plain') || '(table pasted)';
+    parsePasted();
+  }
+});
+document.getElementById('pasteBox').addEventListener('input', () => { paste.html = ''; parsePasted(); });
+document.getElementById('pasteGroup').addEventListener('change', () => { paste.groupTouched = true; renderPastePreview(); });
+document.getElementById('pasteSection').addEventListener('change', (e) => {
+  document.getElementById('pasteNewSection').style.display = e.target.value === '__new' ? 'block' : 'none';
+});
+document.getElementById('pasteCancel').addEventListener('click', () => document.getElementById('pasteOverlay').classList.remove('show'));
+document.getElementById('pasteImport').addEventListener('click', () => {
+  const c = state.characters[currentChar];
+  let secName = document.getElementById('pasteSection').value;
+  if (secName === '__new') {
+    secName = document.getElementById('pasteNewSection').value.trim();
+    if (!secName) { showAlert('Give the new section a name.'); return; }
+  }
+  let sec = c.sections.find(s => s.name === secName);
+  if (!sec) { sec = { name: secName, subsections: [] }; c.sections.push(sec); }
+  c.lastPasteSection = sec.name;
+  const key = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
+  let added = 0, skipped = 0;
+  paste.parsed.forEach(p => {
+    const sub = pasteTargets(p);
+    if (sub && !sec.subsections.includes(sub)) sec.subsections.push(sub);
+    const dupe = c.moves.some(m => key(m.notation) === key(p.notation) && m.section === sec.name && (m.subsection || '') === sub);
+    if (dupe) { skipped++; return; }
+    let startup = p.startup || '';
+    const enemy = p.enemy ? parseFrame(p.enemy) : null;
+    if (!startup && enemy !== null) startup = 'i' + Math.abs(enemy);
+    c.moves.push({
+      id: uid(), notation: p.notation, name: p.name || '', levels: parseLevels(p.levels),
+      section: sec.name, subsection: sub,
+      damage: p.damage || '', startup, block: p.block || '', hit: p.hit || '', ch: p.ch || '',
+      combo: '', punish: enemy !== null ? `Punishes ${enemy > 0 ? '-' + enemy : enemy} on block` : '',
+      notes: p.notes || '', tags: [],
+    });
+    added++;
+  });
+  save();
+  renderSidebar();
+  renderMain();
+  document.getElementById('pasteOverlay').classList.remove('show');
+  showAlert(`Added ${added} move${added === 1 ? '' : 's'} to "${sec.name}".` + (skipped ? ` Skipped ${skipped} already logged there.` : ''));
+});
+
+/* ---------- Punish finder ---------- */
+function renderFinder() {
+  const out = document.getElementById('finderResults');
+  const raw = document.getElementById('finderInput').value;
+  const v = parseFrame(raw);
+  if (v === null) { out.innerHTML = ''; return; }
+  const need = Math.abs(v);
+  if (need < 10) {
+    out.innerHTML = `<div class="finder-head">At ${-need} on block nothing is guaranteed: the fastest moves in Tekken are 10 frames. You get your turn back, not a punish.</div>`;
+    return;
+  }
+  const all = currentMoves();
+  // the same move logged in two sections should only be suggested once
+  const seen = new Set();
+  const unique = all.filter(m => { const k = String(m.notation).toLowerCase().replace(/\s+/g, ''); if (seen.has(k)) return false; seen.add(k); return true; });
+  const withStartup = unique.filter(m => startupOf(m) !== null);
+  const fits = withStartup.filter(m => startupOf(m) <= need);
+  const crouching = m => /^\s*(ws|fc|wr)/i.test(m.notation);
+  const rank = (a, b) => ((punishDamage(b.damage) ?? -1) - (punishDamage(a.damage) ?? -1)) || (startupOf(a) - startupOf(b));
+  const standing = fits.filter(m => !crouching(m)).sort(rank);
+  const crouch = fits.filter(crouching).sort(rank);
+  const row = (m, best) => `<div class="finder-row${best ? ' best' : ''}">
+      <div><span class="lbl">${best ? 'Best' : 'Move'}</span><b class="notation">${escapeHtml(m.notation)}</b></div>
+      <div><span class="lbl">Damage</span>${escapeHtml(m.damage || '—')}</div>
+      <div><span class="lbl">Startup</span>${escapeHtml(m.startup)}</div>
+      <div><span class="lbl">On hit</span>${escapeHtml(m.hit || '—')}</div>
+    </div>`;
+  const SHOW = 8;
+  const group = (title, list, note) => list.length
+    ? `<div class="finder-group"><h3>${title}</h3>${note ? `<div class="hint">${note}</div>` : ''}${list.slice(0, SHOW).map((m, i) => row(m, i === 0)).join('')}` +
+      (list.length > SHOW ? `<div class="hint">+ ${list.length - SHOW} more fast enough, with less damage.</div>` : '') + '</div>' : '';
+  let html = `<div class="finder-head">Opponent at <b>${-need}</b>: you have <b>${need}</b> frames.</div>`;
+  if (!fits.length) {
+    const fastest = withStartup.map(startupOf).sort((a, b) => a - b)[0];
+    html += `<div class="hint" style="font-size:13px;margin-top:8px">Nothing logged for ${escapeHtml(currentChar)} is fast enough.` +
+      (fastest ? ` Your fastest logged move is i${fastest}.` : '') + '</div>';
+  }
+  html += group('Standing punishes', standing);
+  html += group('While-standing punishes', crouch, 'For when you blocked crouching (e.g. after a low).');
+  const missing = unique.length - withStartup.length;
+  if (missing) html += `<div class="hint" style="margin-top:10px">${missing} move${missing === 1 ? ' has' : 's have'} no startup logged, so ${missing === 1 ? 'it isn\'t' : 'they aren\'t'} included.</div>`;
+  out.innerHTML = html;
+}
+document.getElementById('finderBtn').addEventListener('click', () => {
+  if (!currentChar) return;
+  document.getElementById('finderInput').value = '';
+  document.getElementById('finderResults').innerHTML = '';
+  document.getElementById('finderOverlay').classList.add('show');
+});
+document.getElementById('finderQuick').innerHTML = [-10, -11, -12, -13, -14, -15, -16, -17, -20, -23]
+  .map(n => `<div class="tag-choice" data-v="${n}">${n}</div>`).join('');
+document.getElementById('finderQuick').addEventListener('click', (e) => {
+  const v = e.target.dataset && e.target.dataset.v;
+  if (!v) return;
+  document.getElementById('finderInput').value = v;
+  renderFinder();
+});
+document.getElementById('finderInput').addEventListener('input', renderFinder);
+document.getElementById('finderClose').addEventListener('click', () => document.getElementById('finderOverlay').classList.remove('show'));
+document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
+
 // Init
 load();
 const firstChar = Object.keys(state.characters).sort()[0];
@@ -2047,7 +2407,7 @@ renderSidebar();
 renderMain();
 initGistSync();
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {}));
 }
 </script>
 </body>
