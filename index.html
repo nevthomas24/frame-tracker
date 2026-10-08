@@ -1,0 +1,2054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tekken 8 Frame Data Tracker</title>
+<meta name="theme-color" content="#171a21">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Frame Data">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #0f1115;
+    --bg-elev: #171a21;
+    --bg-elev-2: #1f232c;
+    --border: #2a2f3a;
+    --text: #e8eaed;
+    --text-dim: #9aa0ab;
+    --accent: #ff5c5c;
+    --accent-2: #5c8aff;
+    --good: #3ecf6a;
+    --mid: #e6b800;
+    --bad: #ff5c5c;
+    --radius: 10px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f6f8;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #eef0f3;
+    --border: #dbdfe6;
+    --text: #1a1d23;
+    --text-dim: #62697a;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f5f6f8;
+      --bg-elev: #ffffff;
+      --bg-elev-2: #eef0f3;
+      --border: #dbdfe6;
+      --text: #1a1d23;
+      --text-dim: #62697a;
+      color-scheme: light;
+    }
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+  header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 20;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 17px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header h1 .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  .header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg-elev-2);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover { border-color: var(--accent-2); }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #17110f;
+    font-weight: 600;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  .sync-status {
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .sync-status[data-state="synced"] { color: var(--good); border-color: var(--good); }
+  .sync-status[data-state="saving"] { color: var(--accent-2); border-color: var(--accent-2); }
+  .sync-status[data-state="error"] { color: var(--bad); border-color: var(--bad); }
+  button.sections-cta {
+    background: transparent;
+    border: 1.5px solid var(--accent-2);
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+  button.sections-cta:hover { background: rgba(92,138,255,0.12); }
+  button.ghost { background: transparent; }
+  button.small { padding: 5px 9px; font-size: 12px; }
+  button.icon { padding: 6px 8px; line-height: 1; }
+  input, select, textarea {
+    font-family: inherit;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent-2);
+  }
+  .layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  nav.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+  nav.sidebar .add-char {
+    display: flex;
+    gap: 6px;
+  }
+  nav.sidebar .add-char input { flex: 1; min-width: 0; }
+  .char-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+  }
+  .char-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    gap: 6px;
+  }
+  .char-item:hover { background: var(--bg-elev-2); }
+  .char-item.active {
+    background: var(--bg-elev-2);
+    border: 1px solid var(--accent-2);
+  }
+  .char-item .cname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .char-item .count { color: var(--text-dim); font-size: 11px; }
+  .char-item .del-btn {
+    opacity: 0.5;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    padding: 5px 8px;
+    font-size: 13px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .char-item .del-btn:hover, .char-item .del-btn:active {
+    opacity: 1;
+    background: rgba(255,92,92,0.15);
+    color: var(--bad);
+  }
+  .empty-hint {
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 8px 2px;
+    line-height: 1.5;
+  }
+  main {
+    flex: 1;
+    min-width: 0;
+    padding: 16px 18px 40px;
+    overflow-y: auto;
+  }
+  .toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .toolbar-actions input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+    padding: 8px 10px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .toolbar select { min-width: 120px; }
+  .filter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-dim);
+    font-weight: 600;
+    padding-right: 2px;
+  }
+  .stat-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .stat b { color: var(--text); font-size: 15px; display: block; }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-elev);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 900px;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  .sort-hint { opacity: 0.4; font-size: 9px; }
+  thead th:hover .sort-hint { opacity: 0.9; }
+  tbody td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    white-space: nowrap;
+  }
+  tbody td.wrap { white-space: normal; max-width: 220px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--bg-elev-2); }
+  .notation { font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    margin: 1px 2px 1px 0;
+    white-space: nowrap;
+  }
+  .frame-pill {
+    display: inline-block;
+    min-width: 34px;
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .frame-good { background: rgba(62,207,106,0.15); color: var(--good); }
+  .frame-mid  { background: rgba(230,184,0,0.15); color: var(--mid); }
+  .frame-bad  { background: rgba(255,92,92,0.15); color: var(--bad); }
+  .level-pill {
+    display: inline-block;
+    min-width: 22px;
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 11px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .level-high { background: rgba(230,184,0,0.15); color: var(--mid); }
+  .level-mid  { background: rgba(92,138,255,0.15); color: var(--accent-2); }
+  .level-low  { background: rgba(168,85,247,0.15); color: #b085f5; }
+  .level-specialmid { background: rgba(62,207,106,0.15); color: var(--good); }
+  .level-unblockable { background: rgba(255,92,92,0.15); color: var(--bad); }
+  .row-actions { display: flex; gap: 4px; }
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state .big { font-size: 32px; margin-bottom: 10px; }
+  /* Modal */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 100;
+    padding: 30px 14px;
+    padding-top: calc(30px + env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 560px;
+    padding: 20px;
+  }
+  .modal h2 { margin: 0 0 14px; font-size: 16px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .modal-subhead {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 700;
+    color: var(--accent-2);
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 2px;
+  }
+  .modal-subhead:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .field input, .field select, .field textarea { width: 100%; }
+  .field textarea { resize: vertical; min-height: 44px; }
+  .tag-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .tag-choice {
+    font-size: 11px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev-2);
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .tag-choice.selected {
+    background: var(--accent-2);
+    border-color: var(--accent-2);
+    color: #0f1115;
+    font-weight: 600;
+  }
+  .level-seq {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    padding: 4px 2px;
+  }
+  .level-seq .placeholder { color: var(--text-dim); font-size: 12px; }
+  .level-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 3px 2px 6px;
+  }
+  .level-chip-del {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 2px 4px;
+    line-height: 1;
+  }
+  .level-chip-del:hover { color: var(--bad); }
+  .level-arrow { color: var(--text-dim); font-size: 12px; }
+  .modal-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+    gap: 8px;
+  }
+  .modal-actions .right { display: flex; gap: 8px; }
+  .hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: -4px;
+    margin-bottom: 8px;
+  }
+  tr.section-row td {
+    background: var(--bg-elev-2);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--accent-2);
+    cursor: pointer;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+  tr.section-row .sec-count {
+    color: var(--text-dim);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 6px;
+    font-size: 11px;
+  }
+  tr.section-row .caret { display: inline-block; width: 12px; }
+  tr.subsection-row td {
+    background: var(--bg-elev);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 6px 10px 6px 30px;
+    white-space: nowrap;
+    border-left: 2px solid var(--accent-2);
+  }
+  tr.subsection-row .sec-count {
+    color: var(--text-dim);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 6px;
+    font-size: 11px;
+  }
+  tr.subsection-row .caret { display: inline-block; width: 12px; }
+  .section-row-flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .sec-add-btn {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    font-size: 11px;
+    padding: 4px 10px;
+    color: var(--text);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .sec-add-btn:hover { border-color: var(--accent-2); }
+  .sections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .sec-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+  }
+  .sec-row input { flex: 1; min-width: 0; }
+  .sec-block {
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+  }
+  .sec-block .sec-row {
+    background: transparent;
+    border: none;
+    padding: 0 0 6px;
+  }
+  .sec-block .sec-row input {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+  }
+  .subsec-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0 8px 22px;
+    padding-left: 8px;
+    border-left: 2px solid var(--border);
+  }
+  .subsec-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 6px;
+  }
+  .subsec-row input { flex: 1; min-width: 0; font-size: 12px; padding: 5px 7px; }
+  .add-subsection-row {
+    display: flex;
+    gap: 6px;
+    margin-left: 22px;
+  }
+  .add-subsection-row input { flex: 1; font-size: 12px; padding: 6px 8px; }
+  .add-section-row { display: flex; gap: 6px; margin-bottom: 14px; }
+  .add-section-row input { flex: 1; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  @media (max-width: 760px) {
+    .layout { flex-direction: column; }
+    nav.sidebar {
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      max-height: 220px;
+    }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🥋 Tekken 8 Frame Data Tracker <span class="sub">your personal movelist notebook</span></h1>
+  <div class="header-actions">
+    <button type="button" class="sync-status" id="syncStatus" data-state="local" title="Sync settings">⚙️ Set up sync</button>
+    <button class="icon ghost" id="themeToggle" title="Toggle theme">🌓</button>
+    <button class="small" id="exportBtn">Export JSON</button>
+    <button class="small" id="importBtn">Import JSON</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="add-char">
+      <input type="text" id="newCharInput" placeholder="Add character…">
+      <button class="primary small" id="addCharBtn">Add</button>
+    </div>
+    <div class="char-list" id="charList"></div>
+    <div class="empty-hint" id="sidebarHint"></div>
+  </nav>
+
+  <main>
+    <div class="toolbar-actions" id="toolbarActions" style="display:none">
+      <input type="text" id="searchInput" placeholder="🔍 Search notation, name, notes…">
+      <button id="manageSectionsBtn" class="sections-cta">✏️ Add / Edit Sections</button>
+      <button id="manageColumnsBtn" class="sections-cta">↔ Reorder Columns</button>
+      <button class="primary" id="addMoveBtn">+ Add Move</button>
+    </div>
+    <div class="toolbar" id="toolbar" style="display:none">
+      <span class="filter-label">Filter:</span>
+      <select id="tagFilter"><option value="">All tags</option></select>
+      <select id="levelFilter">
+        <option value="">All levels</option>
+        <option value="High">High</option>
+        <option value="Mid">Mid</option>
+        <option value="Low">Low</option>
+        <option value="Special Mid">Special Mid</option>
+        <option value="Unblockable">Unblockable</option>
+      </select>
+      <select id="punishFilter">
+        <option value="">Any block adv.</option>
+        <option value="plus">Plus on block (safe+)</option>
+        <option value="minor">-1 to -9</option>
+        <option value="punishable">-10 or worse (punishable)</option>
+      </select>
+      <select id="sectionFilter"><option value="">All sections</option></select>
+      <button class="ghost small" id="clearFiltersBtn">Clear</button>
+    </div>
+
+    <div class="stat-row" id="statRow" style="display:none"></div>
+
+    <div id="tableArea"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Move</h2>
+    <div class="form-grid">
+      <div class="modal-subhead">Basics</div>
+      <div class="field"><label>Notation *</label><input id="f_notation" placeholder="e.g. df+2"></div>
+      <div class="field"><label>Move name</label><input id="f_name" placeholder="e.g. Demolition Man"></div>
+      <div class="field full">
+        <label>Hit level(s) — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string)</label>
+        <div class="level-seq" id="levelSeq"></div>
+        <div class="tag-picker" id="levelPicker">
+          <div class="tag-choice level-choice" data-level="High">High</div>
+          <div class="tag-choice level-choice" data-level="Mid">Mid</div>
+          <div class="tag-choice level-choice" data-level="Low">Low</div>
+          <div class="tag-choice level-choice" data-level="Special Mid">Special Mid</div>
+          <div class="tag-choice level-choice" data-level="Unblockable">Unblockable</div>
+        </div>
+      </div>
+      <div class="field"><label>Section</label>
+        <select id="f_section"></select>
+      </div>
+      <div class="field"><label>Subsection</label>
+        <select id="f_subsection"></select>
+      </div>
+
+      <div class="modal-subhead">Frame Data</div>
+      <div class="field"><label>Damage</label><input id="f_damage" placeholder="e.g. 22"></div>
+      <div class="field"><label>Startup (frames)</label><input id="f_startup" placeholder="e.g. i15"></div>
+      <div class="field"><label>On block</label><input id="f_block" placeholder="e.g. -9 or +3"></div>
+      <div class="field"><label>On hit</label><input id="f_hit" placeholder="e.g. +5"></div>
+      <div class="field full"><label>On counter hit</label><input id="f_ch" placeholder="e.g. +12 launch"></div>
+
+      <div class="modal-subhead">Tags</div>
+      <div class="field full">
+        <div class="tag-picker" id="tagPicker"></div>
+        <input id="f_customTag" placeholder="add custom tag + press Enter" style="margin-top:6px;width:100%">
+      </div>
+
+      <div class="modal-subhead">Combos &amp; Notes</div>
+      <div class="field full"><label>Natural combo / follow-up</label><textarea id="f_combo" placeholder="e.g. 1,2,3 (last hit low, delayable)"></textarea></div>
+      <div class="field full"><label>Punish notes</label><textarea id="f_punish" placeholder="e.g. launch punishable with df+2 by most of cast"></textarea></div>
+      <div class="field full"><label>Other notes</label><textarea id="f_notes" placeholder="matchup notes, heat engager info, whiff punish uses…"></textarea></div>
+    </div>
+    <div class="hint">* Required. Startup/block/hit fields accept any text — use whatever notation you're used to (i15, +3, KND, etc).</div>
+    <div class="modal-actions">
+      <button class="ghost" id="cancelBtn">Cancel</button>
+      <div class="right">
+        <button id="deleteMoveBtn" style="display:none;border-color:var(--bad);color:var(--bad)">Delete move</button>
+        <button id="saveAddAnotherBtn">Save &amp; Add Another</button>
+        <button class="primary" id="saveMoveBtn">Save move</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="sectionsOverlay">
+  <div class="modal">
+    <h2>Add / Edit / Delete Sections</h2>
+    <div class="hint">Sections are subheaders (e.g. Standing, Crouching) that can contain subsections (e.g. -10, -12). To rename one, type a new name and tap ✓ or press Enter. Use ↑↓ to reorder, 🗑/✕ to delete.</div>
+    <div class="add-section-row">
+      <input type="text" id="newSectionInput" placeholder="+ New section name (e.g. Standing)…">
+      <button class="primary small" id="addSectionBtn">Add Section</button>
+    </div>
+    <div class="sections-list" id="sectionsList"></div>
+    <div class="modal-actions">
+      <button class="ghost" id="closeSectionsBtn">Done</button>
+      <div></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="columnsOverlay">
+  <div class="modal">
+    <h2>Reorder Columns</h2>
+    <div class="hint">Use ↑↓ to change the order columns appear in the table. "Actions" always stays last.</div>
+    <div class="sections-list" id="columnsList"></div>
+    <div class="modal-actions">
+      <button class="ghost" id="resetColumnsBtn">Reset to default</button>
+      <button class="primary small" id="closeColumnsBtn">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="syncOverlay">
+  <div class="modal">
+    <h2>Sync between devices</h2>
+    <div class="hint" style="margin-top:0;font-size:12px;line-height:1.6">
+      This app always saves on this device first, so it works with no internet. To also keep your iPad,
+      phone and computer in step, it stores a copy in a <b>private gist</b> on your GitHub account and syncs
+      whenever you're online.
+    </div>
+    <div id="syncConnectedNote" class="hint" style="display:none;color:var(--good);font-size:12px">✓ Sync is on for this device. Paste a new token below only if you want to replace it.</div>
+    <ol style="font-size:13px;line-height:1.7;padding-left:20px;margin:10px 0 14px">
+      <li><a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Tekken%20Frame%20Tracker" target="_blank" rel="noopener" style="color:var(--accent-2)">Open GitHub's token page</a> (sign in if asked).</li>
+      <li>Set <b>Expiration</b> to "No expiration" (or a long date). Leave only <b>gist</b> ticked.</li>
+      <li>Tap <b>Generate token</b>, copy it, and paste it here.</li>
+    </ol>
+    <input type="password" id="tokenInput" placeholder="Paste token (starts with ghp_)" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%">
+    <div class="hint" style="margin-top:8px">Use the same token on every device. It's stored only on this device and can only read and write your gists.</div>
+    <div class="modal-actions">
+      <button class="ghost" id="closeSyncBtn">Close</button>
+      <div class="right">
+        <button id="disconnectBtn" style="display:none">Turn off</button>
+        <button id="syncNowBtn">Sync now</button>
+        <button class="primary" id="connectBtn">Connect</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="confirmOverlay">
+  <div class="modal" style="max-width:380px">
+    <p id="confirmMessage" style="margin:0 0 18px;font-size:14px;line-height:1.5"></p>
+    <div class="modal-actions">
+      <button class="ghost" id="confirmCancelBtn">Cancel</button>
+      <button class="primary" id="confirmOkBtn" style="background:var(--bad);border-color:var(--bad);color:#fff">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'tekken8-frame-tracker-data-v1';
+const DEFAULT_TAGS = ['Launcher','Heat Engager','Heat Smash','Power Crush','Homing','Tornado','Wall Splat','Natural Combo','Mixup Tool','Whiff Punisher','Low Poke','High Crush','Panic Button'];
+
+let state = { characters: {} };
+let currentChar = null;
+let editingMoveId = null;
+let sortKey = null;
+let sortDir = 1;
+let selectedTags = new Set();
+let selectedLevels = [];
+let collapsed = new Set();
+function defaultSections() {
+  return [
+    { name: 'Key Moves', subsections: [] },
+    { name: 'Punishes', subsections: [] },
+    { name: 'Natural Combos', subsections: [] },
+  ];
+}
+const UNCATEGORIZED = 'Uncategorized';
+const COLUMN_DEFS = {
+  notation: 'Notation', name: 'Name', level: 'Level', damage: 'Dmg',
+  startup: 'Start', block: 'Block', hit: 'Hit', ch: 'CH', tags: 'Tags', combo: 'Combo/Notes',
+};
+const DEFAULT_COLUMN_ORDER = ['notation','name','level','damage','startup','block','hit','ch','tags','combo'];
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch (e) { console.error('Load failed', e); }
+  normalizeState();
+  // remember each character's content as loaded, so save() can stamp updatedAt only on real edits
+  Object.entries(state.characters).forEach(([n, c]) => { sync.lastBody[n] = charBody(c); });
+  sync.lastColumns = JSON.stringify(state.columnOrder);
+}
+function normalizeState() {
+  if (!state || typeof state !== 'object') state = { characters: {} };
+  if (!state.characters || typeof state.characters !== 'object') state.characters = {};
+  if (!state.deleted || typeof state.deleted !== 'object') state.deleted = {};
+  // migrate older saves that predate sections, and older saves with flat string sections
+  Object.values(state.characters).forEach(c => {
+    if (!Array.isArray(c.moves)) c.moves = [];
+    if (!Array.isArray(c.sections)) c.sections = [];
+    c.sections = c.sections.map(s => typeof s === 'string' ? { name: s, subsections: [] } : { name: s.name, subsections: Array.isArray(s.subsections) ? s.subsections : [] });
+    c.moves.forEach(m => {
+      if (typeof m.section !== 'string') m.section = '';
+      if (typeof m.subsection !== 'string') m.subsection = '';
+      if (!Array.isArray(m.levels)) m.levels = m.level ? [m.level] : [];
+      delete m.level;
+    });
+  });
+  // column order is a global display preference (not per-character); keep only known
+  // keys in whatever order was saved, then append any new columns we don't know about yet
+  if (!Array.isArray(state.columnOrder)) {
+    state.columnOrder = [...DEFAULT_COLUMN_ORDER];
+  } else {
+    const known = new Set(DEFAULT_COLUMN_ORDER);
+    const filtered = state.columnOrder.filter(k => known.has(k));
+    DEFAULT_COLUMN_ORDER.forEach(k => { if (!filtered.includes(k)) filtered.push(k); });
+    state.columnOrder = filtered;
+  }
+}
+function saveLocal() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) { /* storage blocked: the synced copy (when set up) still holds the data */ }
+}
+function save() {
+  // stamp edit time on every character whose content actually changed
+  const now = Date.now();
+  Object.entries(state.characters).forEach(([n, c]) => {
+    const body = charBody(c);
+    if (sync.lastBody[n] !== body) { c.updatedAt = now; sync.lastBody[n] = body; }
+  });
+  Object.keys(sync.lastBody).forEach(n => { if (!state.characters[n]) delete sync.lastBody[n]; });
+  const cols = JSON.stringify(state.columnOrder);
+  if (sync.lastColumns !== null && sync.lastColumns !== cols) state.columnOrderAt = now;
+  sync.lastColumns = cols;
+  saveLocal();
+  schedulePush();
+}
+
+/* ---------- Offline-first sync via a private GitHub Gist ----------
+   Everything is saved on this device first, so the app works with no internet.
+   When a GitHub token is set up and the device is online, the whole notebook is
+   merged with one private ("secret") gist: the newer copy of each character wins,
+   and a deletion beats any copy older than it. */
+const GIST_FILE = 'tekken8-tracker-data.json';
+const SYNC_KEY = 'tekken8-gist-sync-v1';
+const sync = {
+  token: '', gistId: '',
+  lastBody: {},       // name -> content as last saved locally (for edit timestamps)
+  lastColumns: null,  // column order as last saved locally
+  timer: null, busy: false, pending: false, lastSyncedAt: 0,
+};
+function loadSyncConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+    sync.token = cfg.token || '';
+    sync.gistId = cfg.gistId || '';
+  } catch (e) {}
+}
+function saveSyncConfig() {
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ token: sync.token, gistId: sync.gistId })); } catch (e) {}
+}
+function charBody(c) {
+  const { updatedAt, cloudId, ...rest } = c;
+  return JSON.stringify(rest);
+}
+function setSyncStatus(kind, text) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  el.dataset.state = kind;
+  el.textContent = text;
+}
+function idleStatus() {
+  if (!sync.token) return setSyncStatus('local', '⚙️ Set up sync');
+  if (!navigator.onLine) return setSyncStatus('local', '📴 Offline — saved on this device');
+  if (sync.lastSyncedAt) {
+    const t = new Date(sync.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return setSyncStatus('synced', '☁️ Synced ' + t);
+  }
+  setSyncStatus('local', '☁️ Not synced yet');
+}
+// key-sorted JSON so identical data always produces identical text (avoids pointless uploads)
+function stableStringify(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().filter(k => v[k] !== undefined)
+      .map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v === undefined ? null : v);
+}
+function syncPayload() {
+  const characters = {};
+  Object.entries(state.characters).forEach(([n, c]) => { const { cloudId, ...rest } = c; characters[n] = rest; });
+  return { version: 1, characters, deleted: state.deleted, columnOrder: state.columnOrder, columnOrderAt: state.columnOrderAt || 0 };
+}
+
+function schedulePush(delay) {
+  if (!sync.token) return;
+  clearTimeout(sync.timer);
+  if (navigator.onLine) setSyncStatus('saving', '☁️ Saving…');
+  sync.timer = setTimeout(syncNow, delay == null ? 1500 : delay);
+}
+
+async function gh(path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, {
+    ...opts,
+    cache: 'no-store',
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + sync.token,
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+  });
+  if (!res.ok) { const err = new Error('GitHub ' + res.status); err.status = res.status; throw err; }
+  return res.status === 204 ? null : res.json();
+}
+
+async function findOrCreateGist() {
+  for (let page = 1; page <= 5; page++) {
+    const list = await gh('/gists?per_page=100&page=' + page);
+    const hit = list.find(g => g.files && g.files[GIST_FILE]);
+    if (hit) return hit.id;
+    if (list.length < 100) break;
+  }
+  const created = await gh('/gists', {
+    method: 'POST',
+    body: JSON.stringify({
+      description: 'Tekken 8 Frame Data Tracker — synced data (do not rename the file)',
+      public: false,
+      files: { [GIST_FILE]: { content: stableStringify(syncPayload()) } },
+    }),
+  });
+  return created.id;
+}
+
+async function fetchRemote() {
+  const g = await gh('/gists/' + sync.gistId);
+  const f = g.files && g.files[GIST_FILE];
+  if (!f) return { raw: null, data: null };
+  let raw = f.content;
+  if (f.truncated && f.raw_url) raw = await (await fetch(f.raw_url, { cache: 'no-store' })).text();
+  try { return { raw, data: JSON.parse(raw) }; } catch (e) { return { raw, data: null }; }
+}
+
+// Merge a remote notebook into this device's. Returns true if this device's data changed.
+function mergeRemote(remote) {
+  if (!remote || typeof remote !== 'object') return false;
+  let changed = false;
+  const rDeleted = remote.deleted || {};
+  Object.entries(rDeleted).forEach(([n, t]) => {
+    if (!state.deleted[n] || state.deleted[n] < t) { state.deleted[n] = t; changed = true; }
+  });
+  const rChars = remote.characters || {};
+  Object.entries(rChars).forEach(([name, rc]) => {
+    if (!rc || typeof rc !== 'object') return;
+    const rAt = rc.updatedAt || 0;
+    if (state.deleted[name] && state.deleted[name] >= rAt) return;
+    const local = state.characters[name];
+    if (local && (local.updatedAt || 0) >= rAt) return; // ours is as new or newer
+    state.characters[name] = JSON.parse(JSON.stringify(rc));
+    changed = true;
+  });
+  Object.keys(state.characters).forEach(name => {
+    const c = state.characters[name];
+    if (state.deleted[name] && state.deleted[name] >= (c.updatedAt || 0)) { delete state.characters[name]; changed = true; }
+  });
+  if (Array.isArray(remote.columnOrder) && (remote.columnOrderAt || 0) > (state.columnOrderAt || 0)) {
+    state.columnOrder = remote.columnOrder.slice();
+    state.columnOrderAt = remote.columnOrderAt;
+    changed = true;
+  }
+  return changed;
+}
+
+function afterRemoteChange() {
+  normalizeState();
+  Object.entries(state.characters).forEach(([n, c]) => { sync.lastBody[n] = charBody(c); });
+  sync.lastColumns = JSON.stringify(state.columnOrder);
+  saveLocal();
+  if (currentChar && !state.characters[currentChar]) currentChar = null;
+  if (!currentChar) currentChar = Object.keys(state.characters).sort()[0] || null;
+  renderSidebar();
+  renderMain();
+}
+
+async function syncNow() {
+  if (!sync.token) { idleStatus(); return; }
+  if (!navigator.onLine) { idleStatus(); return; }
+  if (sync.busy) { sync.pending = true; return; }
+  sync.busy = true;
+  setSyncStatus('saving', '☁️ Syncing…');
+  try {
+    if (!sync.gistId) { sync.gistId = await findOrCreateGist(); saveSyncConfig(); }
+    let remote;
+    try { remote = await fetchRemote(); }
+    catch (e) {
+      if (e.status === 404) { sync.gistId = await findOrCreateGist(); saveSyncConfig(); remote = await fetchRemote(); }
+      else throw e;
+    }
+    if (remote.data && mergeRemote(remote.data)) afterRemoteChange();
+    const body = stableStringify(syncPayload());
+    if (body !== remote.raw) {
+      await gh('/gists/' + sync.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: body } } }) });
+    }
+    sync.lastSyncedAt = Date.now();
+    idleStatus();
+  } catch (e) {
+    if (e.status === 401) setSyncStatus('error', '⚠️ Token rejected — open sync settings');
+    else if (e.status === 403 || e.status === 429) setSyncStatus('error', '⚠️ GitHub busy — will retry');
+    else if (!navigator.onLine || e instanceof TypeError) idleStatus(); // network dropped: try again when back online
+    else setSyncStatus('error', '⚠️ Sync failed — saved on this device');
+  } finally {
+    sync.busy = false;
+    if (sync.pending) { sync.pending = false; schedulePush(300); }
+  }
+}
+
+function initGistSync() {
+  loadSyncConfig();
+  idleStatus();
+  syncNow();
+  window.addEventListener('online', () => syncNow());
+  window.addEventListener('offline', () => idleStatus());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow(); });
+  // pick up edits from your other devices while this one stays open
+  setInterval(() => { if (document.visibilityState === 'visible') syncNow(); }, 60000);
+}
+
+// ----- sync settings dialog -----
+function openSyncSettings() {
+  document.getElementById('tokenInput').value = '';
+  const connected = !!sync.token;
+  document.getElementById('syncConnectedNote').style.display = connected ? 'block' : 'none';
+  document.getElementById('disconnectBtn').style.display = connected ? 'inline-block' : 'none';
+  document.getElementById('syncOverlay').classList.add('show');
+}
+document.getElementById('syncStatus').addEventListener('click', openSyncSettings);
+document.getElementById('closeSyncBtn').addEventListener('click', () => document.getElementById('syncOverlay').classList.remove('show'));
+document.getElementById('syncOverlay').addEventListener('click', (e) => { if (e.target.id === 'syncOverlay') e.currentTarget.classList.remove('show'); });
+document.getElementById('connectBtn').addEventListener('click', async () => {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!token) { showAlert('Paste your GitHub token first.'); return; }
+  if (!navigator.onLine) { showAlert('Connect to Wi-Fi to set up sync — you only need to do this once.'); return; }
+  const prev = { token: sync.token, gistId: sync.gistId };
+  sync.token = token; sync.gistId = '';
+  try {
+    await gh('/gists?per_page=1');
+  } catch (e) {
+    sync.token = prev.token; sync.gistId = prev.gistId;
+    showAlert(e.status === 401
+      ? 'GitHub rejected that token. Make sure you copied all of it, and that it has the "gist" scope.'
+      : 'Couldn\'t reach GitHub. Check your connection and try again.');
+    return;
+  }
+  saveSyncConfig();
+  document.getElementById('syncOverlay').classList.remove('show');
+  await syncNow();
+  showAlert('Sync is on. This device will keep working offline and catch up whenever it\'s back online.');
+});
+document.getElementById('disconnectBtn').addEventListener('click', async () => {
+  const ok = await showConfirm('Turn off sync on this device? Your data stays here and in your gist; this device just stops syncing.', { okText: 'Turn off' });
+  if (!ok) return;
+  sync.token = ''; sync.gistId = ''; sync.lastSyncedAt = 0;
+  saveSyncConfig();
+  document.getElementById('syncOverlay').classList.remove('show');
+  idleStatus();
+});
+document.getElementById('syncNowBtn').addEventListener('click', () => {
+  document.getElementById('syncOverlay').classList.remove('show');
+  syncNow();
+});
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+function showConfirm(message, opts = {}) {
+  const { okText = 'Delete', showCancel = true, danger = true } = opts;
+  return new Promise(resolve => {
+    const overlay = document.getElementById('confirmOverlay');
+    document.getElementById('confirmMessage').textContent = message;
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    okBtn.textContent = okText;
+    if (danger) {
+      okBtn.style.background = 'var(--bad)';
+      okBtn.style.borderColor = 'var(--bad)';
+      okBtn.style.color = '#fff';
+    } else {
+      okBtn.style.background = 'var(--accent)';
+      okBtn.style.borderColor = 'var(--accent)';
+      okBtn.style.color = '#17110f';
+    }
+    cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
+    overlay.classList.add('show');
+    function cleanup(result) {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlay);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    function onOverlay(e) { if (e.target.id === 'confirmOverlay') cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlay);
+  });
+}
+function showAlert(message) {
+  return showConfirm(message, { okText: 'OK', showCancel: false, danger: false });
+}
+
+const LEVEL_INFO = {
+  'High': { cls: 'level-high', abbr: 'H' },
+  'Mid': { cls: 'level-mid', abbr: 'M' },
+  'Low': { cls: 'level-low', abbr: 'L' },
+  'Special Mid': { cls: 'level-specialmid', abbr: 'SM' },
+  'Unblockable': { cls: 'level-unblockable', abbr: 'UB' },
+};
+function levelBadge(level) {
+  if (!level || !LEVEL_INFO[level]) return escapeHtml(level || '—');
+  const info = LEVEL_INFO[level];
+  return `<span class="level-pill ${info.cls}" title="${escapeHtml(level)}">${info.abbr}</span>`;
+}
+function levelSeqBadges(levels) {
+  if (!levels || levels.length === 0) return '—';
+  return levels.map(l => levelBadge(l)).join('<span class="level-arrow">›</span>');
+}
+
+function blockClass(blockStr) {
+  if (!blockStr) return '';
+  const m = String(blockStr).match(/-?\d+/);
+  if (!m) return '';
+  const n = parseInt(m[0], 10);
+  if (String(blockStr).trim().startsWith('-') === false && n >= 0) return 'frame-good';
+  const val = String(blockStr).includes('-') ? -Math.abs(n) : n;
+  if (val >= 0) return 'frame-good';
+  if (val <= -10) return 'frame-bad';
+  return 'frame-mid';
+}
+
+function renderSidebar() {
+  const list = document.getElementById('charList');
+  const names = Object.keys(state.characters).sort((a,b)=>a.localeCompare(b));
+  list.innerHTML = '';
+  document.getElementById('sidebarHint').textContent = names.length === 0
+    ? 'Add a character above to start logging moves for them.'
+    : '';
+  names.forEach(name => {
+    const div = document.createElement('div');
+    div.className = 'char-item' + (name === currentChar ? ' active' : '');
+    const moveCount = state.characters[name].moves.length;
+    div.innerHTML = `<span class="cname">${escapeHtml(name)}</span><span class="count">${moveCount}</span><button class="del-btn" title="Delete character">🗑</button>`;
+    div.addEventListener('click', (e) => {
+      if (e.target.classList.contains('del-btn')) return;
+      currentChar = name;
+      renderSidebar();
+      renderMain();
+    });
+    div.querySelector('.del-btn').addEventListener('click', async () => {
+      const ok = await showConfirm(`Delete "${name}" and all logged moves? This can't be undone.`);
+      if (ok) {
+        delete state.characters[name];
+        state.deleted[name] = Date.now(); // so other devices drop it too
+        if (currentChar === name) currentChar = null;
+        save();
+        renderSidebar();
+        renderMain();
+      }
+    });
+    list.appendChild(div);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function currentMoves() {
+  if (!currentChar) return [];
+  return state.characters[currentChar].moves;
+}
+
+function populateTagFilter() {
+  const sel = document.getElementById('tagFilter');
+  const allTags = new Set();
+  currentMoves().forEach(m => (m.tags||[]).forEach(t => allTags.add(t)));
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">All tags</option>' +
+    [...allTags].sort().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  sel.value = prev;
+}
+
+function populateSectionFilter() {
+  const sel = document.getElementById('sectionFilter');
+  const secs = state.characters[currentChar]?.sections || [];
+  const prev = sel.value;
+  let html = '<option value="">All sections</option>';
+  secs.forEach(s => {
+    html += `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`;
+    s.subsections.forEach(sub => {
+      html += `<option value="${escapeHtml(s.name)}::${escapeHtml(sub)}">&nbsp;&nbsp;↳ ${escapeHtml(sub)}</option>`;
+    });
+  });
+  html += `<option value="${UNCATEGORIZED}">${UNCATEGORIZED}</option>`;
+  sel.innerHTML = html;
+  sel.value = prev;
+}
+
+function renderStats() {
+  const moves = currentMoves();
+  const statRow = document.getElementById('statRow');
+  if (!currentChar || moves.length === 0) { statRow.style.display = 'none'; return; }
+  statRow.style.display = 'flex';
+  const launchers = moves.filter(m => (m.tags||[]).includes('Launcher')).length;
+  const punishable = moves.filter(m => {
+    const mm = String(m.block||'').match(/-?\d+/);
+    return mm && (String(m.block).includes('-') ? -Math.abs(parseInt(mm[0])) : parseInt(mm[0])) <= -10;
+  }).length;
+  const plusOnBlock = moves.filter(m => {
+    const mm = String(m.block||'').match(/-?\d+/);
+    if (!mm) return false;
+    const isNeg = String(m.block).trim().startsWith('-');
+    return !isNeg;
+  }).length;
+  statRow.innerHTML = `
+    <div class="stat"><b>${moves.length}</b>Total moves logged</div>
+    <div class="stat"><b>${launchers}</b>Launchers</div>
+    <div class="stat"><b>${plusOnBlock}</b>Plus on block</div>
+    <div class="stat"><b>${punishable}</b>Punishable (-10 or worse)</div>
+  `;
+}
+
+function renderMain() {
+  const toolbar = document.getElementById('toolbar');
+  const toolbarActions = document.getElementById('toolbarActions');
+  const area = document.getElementById('tableArea');
+  if (!currentChar) {
+    toolbar.style.display = 'none';
+    toolbarActions.style.display = 'none';
+    document.getElementById('statRow').style.display = 'none';
+    area.innerHTML = `<div class="empty-state"><div class="big">🎮</div>
+      <div>Pick or add a character on the left to start logging moves.</div></div>`;
+    return;
+  }
+  toolbar.style.display = 'flex';
+  toolbarActions.style.display = 'flex';
+  populateTagFilter();
+  populateSectionFilter();
+  renderStats();
+
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const tagF = document.getElementById('tagFilter').value;
+  const levelF = document.getElementById('levelFilter').value;
+  const punishF = document.getElementById('punishFilter').value;
+  const sectionF = document.getElementById('sectionFilter').value;
+
+  let moves = currentMoves().slice();
+
+  if (search) {
+    moves = moves.filter(m =>
+      (m.notation||'').toLowerCase().includes(search) ||
+      (m.name||'').toLowerCase().includes(search) ||
+      (m.notes||'').toLowerCase().includes(search) ||
+      (m.punish||'').toLowerCase().includes(search) ||
+      (m.combo||'').toLowerCase().includes(search)
+    );
+  }
+  if (tagF) moves = moves.filter(m => (m.tags||[]).includes(tagF));
+  if (levelF) moves = moves.filter(m => (m.levels||[]).includes(levelF));
+  if (sectionF) {
+    const knownSectionNames = (state.characters[currentChar].sections || []).map(s => s.name);
+    if (sectionF === UNCATEGORIZED) {
+      moves = moves.filter(m => !m.section || !knownSectionNames.includes(m.section));
+    } else if (sectionF.includes('::')) {
+      const [sn, subn] = sectionF.split('::');
+      moves = moves.filter(m => m.section === sn && m.subsection === subn);
+    } else {
+      moves = moves.filter(m => m.section === sectionF);
+    }
+  }
+  if (punishF) {
+    moves = moves.filter(m => {
+      const mm = String(m.block||'').match(/-?\d+/);
+      if (!mm) return false;
+      const isNeg = String(m.block).trim().startsWith('-');
+      const val = isNeg ? -Math.abs(parseInt(mm[0])) : parseInt(mm[0]);
+      if (punishF === 'plus') return val >= 0;
+      if (punishF === 'minor') return val < 0 && val > -10;
+      if (punishF === 'punishable') return val <= -10;
+      return true;
+    });
+  }
+
+  const LEVEL_SORT_ORDER = ['High', 'Mid', 'Low', 'Special Mid', 'Unblockable'];
+  if (sortKey) {
+    moves.sort((a,b) => {
+      if (sortKey === 'level') {
+        const ai = LEVEL_SORT_ORDER.indexOf((a.levels && a.levels[0]) || '');
+        const bi = LEVEL_SORT_ORDER.indexOf((b.levels && b.levels[0]) || '');
+        return ((ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)) * sortDir;
+      }
+      let av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
+      if (sortKey === 'block' || sortKey === 'hit') {
+        const an = parseInt(String(av).match(/-?\d+/)?.[0] ?? '0', 10) * (String(av).trim().startsWith('-') ? -1 : 1);
+        const bn = parseInt(String(bv).match(/-?\d+/)?.[0] ?? '0', 10) * (String(bv).trim().startsWith('-') ? -1 : 1);
+        return (an - bn) * sortDir;
+      }
+      return String(av).localeCompare(String(bv)) * sortDir;
+    });
+  }
+
+  if (moves.length === 0) {
+    area.innerHTML = `<div class="empty-state"><div class="big">📋</div>
+      <div>No moves match. ${currentMoves().length === 0 ? 'Set up your sections with "✏️ Add / Edit Sections" above, then click "+ Add Move" to log your first move for ' + escapeHtml(currentChar) + '.' : 'Try clearing filters.'}</div></div>`;
+    return;
+  }
+
+  const cols = [...state.columnOrder.map(k => [k, COLUMN_DEFS[k]]), ['actions', '']];
+
+  // group moves by section (preserving order), then within each section by subsection
+  // (only sections that actually define subsections get that extra nesting)
+  const definedSections = (state.characters[currentChar].sections || []);
+  const sectionGroups = definedSections.map(s => ({ name: s.name, subsections: s.subsections, moves: [] }));
+  const uncategorized = { name: UNCATEGORIZED, subsections: [], moves: [] };
+  const byName = new Map(sectionGroups.map(g => [g.name, g]));
+  moves.forEach(m => {
+    const g = (m.section && byName.has(m.section)) ? byName.get(m.section) : uncategorized;
+    g.moves.push(m);
+  });
+  sectionGroups.push(uncategorized);
+
+  let html = `<div class="table-wrap"><table><thead><tr>`;
+  cols.forEach(([key,label]) => {
+    const sortable = key !== 'actions' && key !== 'tags';
+    const indicator = sortKey === key
+      ? (sortDir === 1 ? ' ▲' : ' ▼')
+      : (sortable ? ' <span class="sort-hint">⇅</span>' : '');
+    html += `<th data-key="${key}">${label}${indicator}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+
+  const colCount = cols.length;
+  const manualOrder = !sortKey; // reordering only makes sense on the natural (unsorted) order
+  const cellHtml = (key, m) => {
+    switch (key) {
+      case 'notation': return `<td class="notation">${escapeHtml(m.notation)}</td>`;
+      case 'name': return `<td>${escapeHtml(m.name||'—')}</td>`;
+      case 'level': return `<td>${levelSeqBadges(m.levels)}</td>`;
+      case 'damage': return `<td>${escapeHtml(m.damage||'—')}</td>`;
+      case 'startup': return `<td>${escapeHtml(m.startup||'—')}</td>`;
+      case 'block': return `<td><span class="frame-pill ${blockClass(m.block)}">${escapeHtml(m.block||'—')}</span></td>`;
+      case 'hit': return `<td>${escapeHtml(m.hit||'—')}</td>`;
+      case 'ch': return `<td>${escapeHtml(m.ch||'—')}</td>`;
+      case 'tags': return `<td class="wrap">${(m.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</td>`;
+      case 'combo': return `<td class="wrap">${escapeHtml([m.combo, m.punish, m.notes].filter(Boolean).join(' · ')) || '—'}</td>`;
+      default: return `<td>—</td>`;
+    }
+  };
+  const renderMoveRow = (m, isFirst, isLast) => {
+    const dataCells = state.columnOrder.map(key => cellHtml(key, m)).join('');
+    const actionsCell = `<td><div class="row-actions">
+          ${manualOrder ? `<button class="small icon move-up-btn" title="Move up" ${isFirst?'disabled':''}>↑</button>
+          <button class="small icon move-down-btn" title="Move down" ${isLast?'disabled':''}>↓</button>` : ''}
+          <button class="small icon edit-btn" title="Edit move">✏️</button>
+          <button class="small icon dup-btn" title="Duplicate move">⧉</button>
+          <button class="small icon row-del-btn" title="Delete move" style="color:var(--bad)">🗑</button>
+        </div></td>`;
+    return `<tr data-id="${m.id}">${dataCells}${actionsCell}</tr>`;
+  };
+
+  for (const sec of sectionGroups) {
+    if (sec.moves.length === 0) continue;
+    const secKey = sec.name;
+    const secCollapsed = collapsed.has(secKey);
+    html += `<tr class="section-row" data-section="${escapeHtml(sec.name)}">
+      <td colspan="${colCount}">
+        <div class="section-row-flex">
+          <span><span class="caret">${secCollapsed ? '▶' : '▼'}</span>${escapeHtml(sec.name)}<span class="sec-count">${sec.moves.length}</span></span>
+          <span class="row-actions">
+            <button type="button" class="small icon edit-sections-btn" title="Add / edit / delete sections">✏️</button>
+            <button type="button" class="sec-add-btn" data-section="${escapeHtml(sec.name)}">+ Add move here</button>
+          </span>
+        </div>
+      </td>
+    </tr>`;
+    if (secCollapsed) continue;
+
+    if (sec.subsections.length === 0) {
+      // flat section: no subsection nesting
+      sec.moves.forEach((m, idx) => { html += renderMoveRow(m, idx===0, idx===sec.moves.length-1); });
+      continue;
+    }
+
+    // nested: split into named subsections + a leftover "general" bucket
+    const bySub = new Map(sec.subsections.map(sub => [sub, []]));
+    const general = [];
+    sec.moves.forEach(m => {
+      if (m.subsection && bySub.has(m.subsection)) bySub.get(m.subsection).push(m);
+      else general.push(m);
+    });
+    general.forEach((m, idx) => { html += renderMoveRow(m, idx===0, idx===general.length-1); });
+    for (const subName of sec.subsections) {
+      const subMoves = bySub.get(subName);
+      if (subMoves.length === 0) continue;
+      const subKey = secKey + '::' + subName;
+      const subCollapsed = collapsed.has(subKey);
+      html += `<tr class="subsection-row" data-section="${escapeHtml(sec.name)}" data-subsection="${escapeHtml(subName)}">
+        <td colspan="${colCount}">
+          <div class="section-row-flex">
+            <span><span class="caret">${subCollapsed ? '▶' : '▼'}</span>${escapeHtml(subName)}<span class="sec-count">${subMoves.length}</span></span>
+            <span class="row-actions">
+              <button type="button" class="small icon edit-sections-btn" title="Add / edit / delete sections">✏️</button>
+              <button type="button" class="sec-add-btn" data-section="${escapeHtml(sec.name)}" data-subsection="${escapeHtml(subName)}">+ Add move here</button>
+            </span>
+          </div>
+        </td>
+      </tr>`;
+      if (subCollapsed) continue;
+      subMoves.forEach((m, idx) => { html += renderMoveRow(m, idx===0, idx===subMoves.length-1); });
+    }
+  }
+  html += `</tbody></table></div>`;
+  if (!manualOrder) {
+    html = `<div class="hint" style="margin-bottom:10px">Sorted by column — <button type="button" class="small ghost" id="clearSortBtn" style="padding:2px 8px">Clear sort</button> to drag-order moves with ↑↓ again.</div>` + html;
+  }
+  area.innerHTML = html;
+  if (!manualOrder) {
+    document.getElementById('clearSortBtn').addEventListener('click', () => { sortKey = null; sortDir = 1; renderMain(); });
+  }
+
+  area.querySelectorAll('.section-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const name = row.dataset.section;
+      if (collapsed.has(name)) collapsed.delete(name); else collapsed.add(name);
+      renderMain();
+    });
+  });
+  area.querySelectorAll('.subsection-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const key = row.dataset.section + '::' + row.dataset.subsection;
+      if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key);
+      renderMain();
+    });
+  });
+  area.querySelectorAll('.sec-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const secName = btn.dataset.section;
+      const subName = btn.dataset.subsection;
+      openModal(null, secName === UNCATEGORIZED ? '' : secName, subName || undefined);
+    });
+  });
+  area.querySelectorAll('.edit-sections-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderSectionsList();
+      document.getElementById('sectionsOverlay').classList.add('show');
+    });
+  });
+
+  area.querySelectorAll('thead th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (key === 'actions' || key === 'tags') return;
+      if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+      renderMain();
+    });
+  });
+  area.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.closest('tr').dataset.id;
+      openModal(currentMoves().find(m => m.id === id));
+    });
+  });
+  area.querySelectorAll('.move-up-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr');
+      const prevTr = tr.previousElementSibling;
+      if (!prevTr || !prevTr.dataset.id) return; // already first in its group
+      swapMoveOrder(tr.dataset.id, prevTr.dataset.id);
+    });
+  });
+  area.querySelectorAll('.move-down-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr');
+      const nextTr = tr.nextElementSibling;
+      if (!nextTr || !nextTr.dataset.id) return; // already last in its group
+      swapMoveOrder(tr.dataset.id, nextTr.dataset.id);
+    });
+  });
+  area.querySelectorAll('.dup-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.closest('tr').dataset.id;
+      const orig = currentMoves().find(m => m.id === id);
+      const copy = {...orig, id: uid(), notation: orig.notation + ' (copy)', tags: [...(orig.tags||[])], levels: [...(orig.levels||[])]};
+      state.characters[currentChar].moves.push(copy);
+      save(); renderMain(); renderSidebar();
+    });
+  });
+  area.querySelectorAll('.row-del-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.closest('tr').dataset.id;
+      const move = currentMoves().find(m => m.id === id);
+      const ok = await showConfirm(`Delete "${move.notation}"?`);
+      if (!ok) return;
+      const moves = state.characters[currentChar].moves;
+      const idx = moves.findIndex(m => m.id === id);
+      if (idx >= 0) moves.splice(idx, 1);
+      save(); renderMain(); renderSidebar();
+    });
+  });
+}
+
+function buildTagPicker() {
+  const picker = document.getElementById('tagPicker');
+  const allTags = new Set(DEFAULT_TAGS);
+  Object.values(state.characters).forEach(c => c.moves.forEach(m => (m.tags||[]).forEach(t => allTags.add(t))));
+  picker.innerHTML = '';
+  [...allTags].sort().forEach(tag => {
+    const el = document.createElement('div');
+    el.className = 'tag-choice' + (selectedTags.has(tag) ? ' selected' : '');
+    el.textContent = tag;
+    el.addEventListener('click', () => {
+      if (selectedTags.has(tag)) selectedTags.delete(tag); else selectedTags.add(tag);
+      buildTagPicker();
+    });
+    picker.appendChild(el);
+  });
+}
+
+function buildLevelSeq() {
+  const seq = document.getElementById('levelSeq');
+  if (selectedLevels.length === 0) {
+    seq.innerHTML = `<span class="placeholder">No hits added yet — tap a level below for each hit, in order.</span>`;
+    return;
+  }
+  seq.innerHTML = selectedLevels.map((lvl, i) => {
+    const info = LEVEL_INFO[lvl] || { cls: '', abbr: lvl };
+    return `<span class="level-chip"><span class="level-pill ${info.cls}">${escapeHtml(info.abbr)}</span><button type="button" class="level-chip-del" data-idx="${i}" title="Remove this hit">✕</button></span>`;
+  }).join('<span class="level-arrow">›</span>');
+  seq.querySelectorAll('.level-chip-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedLevels.splice(parseInt(btn.dataset.idx, 10), 1);
+      buildLevelSeq();
+    });
+  });
+}
+
+function refreshSubsectionOptions(selectedSub) {
+  const secSel = document.getElementById('f_section');
+  const subSel = document.getElementById('f_subsection');
+  const secs = state.characters[currentChar]?.sections || [];
+  const chosen = secs.find(s => s.name === secSel.value);
+  const subs = chosen ? chosen.subsections : [];
+  subSel.innerHTML = `<option value="">— none —</option>` +
+    subs.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  subSel.value = (selectedSub && subs.includes(selectedSub)) ? selectedSub : '';
+  subSel.disabled = subs.length === 0;
+}
+
+function openModal(move, defaultSection, defaultSubsection) {
+  editingMoveId = move ? move.id : null;
+  const secs = state.characters[currentChar].sections || [];
+  const initialSection = move
+    ? (move.section || '')
+    : (defaultSection !== undefined ? defaultSection : (state.characters[currentChar].lastSection || ''));
+  const initialSubsection = move
+    ? (move.subsection || '')
+    : (defaultSubsection !== undefined ? defaultSubsection : (state.characters[currentChar].lastSubsection || ''));
+  document.getElementById('modalTitle').textContent = move
+    ? 'Edit Move'
+    : (initialSection ? `Add Move — ${initialSection}${initialSubsection ? ' / ' + initialSubsection : ''}` : 'Add Move');
+  document.getElementById('f_notation').value = move?.notation || '';
+  document.getElementById('f_name').value = move?.name || '';
+  selectedLevels = move?.levels ? [...move.levels] : [];
+  buildLevelSeq();
+  const secSel = document.getElementById('f_section');
+  secSel.innerHTML = `<option value="">${UNCATEGORIZED}</option>` +
+    secs.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+  secSel.value = secs.some(s => s.name === initialSection) ? initialSection : '';
+  refreshSubsectionOptions(initialSubsection);
+  document.getElementById('f_damage').value = move?.damage || '';
+  document.getElementById('f_startup').value = move?.startup || '';
+  document.getElementById('f_block').value = move?.block || '';
+  document.getElementById('f_hit').value = move?.hit || '';
+  document.getElementById('f_ch').value = move?.ch || '';
+  document.getElementById('f_combo').value = move?.combo || '';
+  document.getElementById('f_punish').value = move?.punish || '';
+  document.getElementById('f_notes').value = move?.notes || '';
+  selectedTags = new Set(move?.tags || []);
+  buildTagPicker();
+  document.getElementById('deleteMoveBtn').style.display = move ? 'inline-block' : 'none';
+  document.getElementById('saveAddAnotherBtn').style.display = move ? 'none' : 'inline-block';
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('f_notation').focus();
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('show');
+  editingMoveId = null;
+}
+
+function saveMove(keepOpen) {
+  const notation = document.getElementById('f_notation').value.trim();
+  if (!notation) { showAlert('Notation is required (e.g. df+2).'); return; }
+  const data = {
+    notation,
+    name: document.getElementById('f_name').value.trim(),
+    levels: [...selectedLevels],
+    section: document.getElementById('f_section').value,
+    subsection: document.getElementById('f_subsection').value,
+    damage: document.getElementById('f_damage').value.trim(),
+    startup: document.getElementById('f_startup').value.trim(),
+    block: document.getElementById('f_block').value.trim(),
+    hit: document.getElementById('f_hit').value.trim(),
+    ch: document.getElementById('f_ch').value.trim(),
+    combo: document.getElementById('f_combo').value.trim(),
+    punish: document.getElementById('f_punish').value.trim(),
+    notes: document.getElementById('f_notes').value.trim(),
+    tags: [...selectedTags],
+  };
+  const moves = state.characters[currentChar].moves;
+  const wasEditing = !!editingMoveId;
+  if (editingMoveId) {
+    const idx = moves.findIndex(m => m.id === editingMoveId);
+    moves[idx] = {...moves[idx], ...data};
+  } else {
+    moves.push({id: uid(), ...data});
+  }
+  state.characters[currentChar].lastSection = data.section;
+  state.characters[currentChar].lastSubsection = data.subsection;
+  save();
+  renderMain();
+  renderSidebar();
+  if (keepOpen && !wasEditing) {
+    resetFormForNextMove();
+  } else {
+    closeModal();
+  }
+}
+
+function resetFormForNextMove() {
+  // clears everything except Section/Subsection, so back-to-back entries
+  // in the same group don't need re-picking those each time
+  document.getElementById('f_notation').value = '';
+  document.getElementById('f_name').value = '';
+  document.getElementById('f_damage').value = '';
+  document.getElementById('f_startup').value = '';
+  document.getElementById('f_block').value = '';
+  document.getElementById('f_hit').value = '';
+  document.getElementById('f_ch').value = '';
+  document.getElementById('f_combo').value = '';
+  document.getElementById('f_punish').value = '';
+  document.getElementById('f_notes').value = '';
+  selectedTags = new Set();
+  buildTagPicker();
+  selectedLevels = [];
+  buildLevelSeq();
+  document.getElementById('f_notation').focus();
+}
+
+function deleteMove() {
+  if (!editingMoveId) return;
+  showConfirm('Delete this move?').then(ok => {
+    if (!ok) return;
+    const moves = state.characters[currentChar].moves;
+    const idx = moves.findIndex(m => m.id === editingMoveId);
+    if (idx >= 0) moves.splice(idx, 1);
+    save();
+    closeModal();
+    renderMain();
+    renderSidebar();
+  });
+}
+
+function swapMoveOrder(idA, idB) {
+  const moves = state.characters[currentChar].moves;
+  const iA = moves.findIndex(m => m.id === idA);
+  const iB = moves.findIndex(m => m.id === idB);
+  if (iA === -1 || iB === -1) return;
+  [moves[iA], moves[iB]] = [moves[iB], moves[iA]];
+  save();
+  renderMain();
+}
+
+// Events
+document.getElementById('addCharBtn').addEventListener('click', () => {
+  const input = document.getElementById('newCharInput');
+  const name = input.value.trim();
+  if (!name) return;
+  const isNew = !state.characters[name];
+  if (isNew) {
+    state.characters[name] = { moves: [], sections: defaultSections(), updatedAt: Date.now() };
+    delete state.deleted[name];
+  }
+  currentChar = name;
+  input.value = '';
+  save();
+  renderSidebar();
+  renderMain();
+  if (isNew) {
+    renderSectionsList();
+    document.getElementById('sectionsOverlay').classList.add('show');
+  }
+});
+document.getElementById('newCharInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('addCharBtn').click();
+});
+document.getElementById('addMoveBtn').addEventListener('click', () => {
+  const filterVal = document.getElementById('sectionFilter').value;
+  let def, defSub;
+  if (filterVal && filterVal !== UNCATEGORIZED) {
+    if (filterVal.includes('::')) {
+      [def, defSub] = filterVal.split('::');
+    } else {
+      def = filterVal;
+    }
+  }
+  openModal(null, def, defSub);
+});
+document.getElementById('f_section').addEventListener('change', () => refreshSubsectionOptions());
+document.querySelectorAll('#levelPicker .level-choice').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedLevels.push(btn.dataset.level);
+    buildLevelSeq();
+  });
+});
+document.getElementById('cancelBtn').addEventListener('click', closeModal);
+document.getElementById('saveMoveBtn').addEventListener('click', () => saveMove(false));
+document.getElementById('saveAddAnotherBtn').addEventListener('click', () => saveMove(true));
+document.getElementById('deleteMoveBtn').addEventListener('click', deleteMove);
+document.getElementById('overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'overlay') closeModal();
+});
+document.getElementById('f_customTag').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (val) { selectedTags.add(val); buildTagPicker(); e.target.value = ''; }
+  }
+});
+['searchInput','tagFilter','levelFilter','punishFilter','sectionFilter'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderMain);
+  document.getElementById(id).addEventListener('change', renderMain);
+});
+document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('tagFilter').value = '';
+  document.getElementById('levelFilter').value = '';
+  document.getElementById('punishFilter').value = '';
+  document.getElementById('sectionFilter').value = '';
+  renderMain();
+});
+
+function renderSectionsList() {
+  const list = document.getElementById('sectionsList');
+  const secs = state.characters[currentChar]?.sections || [];
+  if (secs.length === 0) {
+    list.innerHTML = `<div class="hint">No sections yet — add one below.</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  secs.forEach((sec, i) => {
+    const block = document.createElement('div');
+    block.className = 'sec-block';
+    block.innerHTML = `
+      <div class="sec-row">
+        <button class="small icon up-btn" ${i===0?'disabled':''}>↑</button>
+        <button class="small icon down-btn" ${i===secs.length-1?'disabled':''}>↓</button>
+        <input type="text" value="${escapeHtml(sec.name)}">
+        <button class="small icon rename-btn" title="Save name">✓</button>
+        <button class="small icon del-btn" style="border-color:var(--bad);color:var(--bad)">🗑</button>
+      </div>
+      <div class="subsec-list"></div>
+      <div class="add-subsection-row">
+        <input type="text" class="new-subsection-input" placeholder="Add subsection (e.g. -10, -12, -14)…">
+        <button class="small add-subsection-btn">Add</button>
+      </div>
+    `;
+
+    // rename / reorder / delete SECTION
+    const nameInput = block.querySelector('.sec-row input');
+    const commitSectionRename = () => {
+      const newName = nameInput.value.trim();
+      if (!newName || newName === sec.name) { nameInput.value = sec.name; return; }
+      if (secs.some(s => s.name === newName)) { showAlert('A section with that name already exists.'); nameInput.value = sec.name; return; }
+      const oldName = sec.name;
+      sec.name = newName;
+      state.characters[currentChar].moves.forEach(m => { if (m.section === oldName) m.section = newName; });
+      save(); renderSectionsList(); renderMain();
+    };
+    nameInput.addEventListener('blur', commitSectionRename);
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nameInput.blur(); } });
+    block.querySelector('.rename-btn').addEventListener('click', commitSectionRename);
+    block.querySelector('.up-btn').addEventListener('click', () => {
+      if (i === 0) return;
+      [secs[i-1], secs[i]] = [secs[i], secs[i-1]];
+      save(); renderSectionsList(); renderMain();
+    });
+    block.querySelector('.down-btn').addEventListener('click', () => {
+      if (i === secs.length-1) return;
+      [secs[i+1], secs[i]] = [secs[i], secs[i+1]];
+      save(); renderSectionsList(); renderMain();
+    });
+    block.querySelector('.del-btn').addEventListener('click', async () => {
+      const inUse = state.characters[currentChar].moves.filter(m => m.section === sec.name).length;
+      const msg = inUse > 0
+        ? `Delete "${sec.name}"? ${inUse} move(s) in it will move to Uncategorized (not deleted).`
+        : `Delete "${sec.name}"?`;
+      const ok = await showConfirm(msg);
+      if (!ok) return;
+      secs.splice(i, 1);
+      state.characters[currentChar].moves.forEach(m => { if (m.section === sec.name) { m.section = ''; m.subsection = ''; } });
+      save(); renderSectionsList(); renderMain();
+    });
+
+    // SUBSECTIONS within this section
+    const subList = block.querySelector('.subsec-list');
+    if (sec.subsections.length === 0) {
+      subList.innerHTML = `<div class="hint" style="margin-left:22px">No subsections in "${escapeHtml(sec.name)}" yet.</div>`;
+    }
+    sec.subsections.forEach((subName, j) => {
+      const subRow = document.createElement('div');
+      subRow.className = 'subsec-row';
+      subRow.innerHTML = `
+        <button class="small icon up-btn" ${j===0?'disabled':''}>↑</button>
+        <button class="small icon down-btn" ${j===sec.subsections.length-1?'disabled':''}>↓</button>
+        <input type="text" value="${escapeHtml(subName)}">
+        <button class="small icon rename-btn" title="Save name">✓</button>
+        <button class="small icon del-btn" style="border-color:var(--bad);color:var(--bad)">✕</button>
+      `;
+      const subInput = subRow.querySelector('input');
+      const commitSubRename = () => {
+        const newName = subInput.value.trim();
+        if (!newName || newName === subName) { subInput.value = subName; return; }
+        if (sec.subsections.includes(newName)) { showAlert('That subsection already exists here.'); subInput.value = subName; return; }
+        const oldSub = subName;
+        sec.subsections[j] = newName;
+        state.characters[currentChar].moves.forEach(m => { if (m.section === sec.name && m.subsection === oldSub) m.subsection = newName; });
+        save(); renderSectionsList(); renderMain();
+      };
+      subInput.addEventListener('blur', commitSubRename);
+      subInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); subInput.blur(); } });
+      subRow.querySelector('.rename-btn').addEventListener('click', commitSubRename);
+      subRow.querySelector('.up-btn').addEventListener('click', () => {
+        if (j === 0) return;
+        [sec.subsections[j-1], sec.subsections[j]] = [sec.subsections[j], sec.subsections[j-1]];
+        save(); renderSectionsList(); renderMain();
+      });
+      subRow.querySelector('.down-btn').addEventListener('click', () => {
+        if (j === sec.subsections.length-1) return;
+        [sec.subsections[j+1], sec.subsections[j]] = [sec.subsections[j], sec.subsections[j+1]];
+        save(); renderSectionsList(); renderMain();
+      });
+      subRow.querySelector('.del-btn').addEventListener('click', async () => {
+        const inUse = state.characters[currentChar].moves.filter(m => m.section === sec.name && m.subsection === subName).length;
+        const msg = inUse > 0
+          ? `Delete "${subName}"? ${inUse} move(s) in it will stay in "${sec.name}" but lose this subsection.`
+          : `Delete "${subName}"?`;
+        const ok = await showConfirm(msg);
+        if (!ok) return;
+        sec.subsections.splice(j, 1);
+        state.characters[currentChar].moves.forEach(m => { if (m.section === sec.name && m.subsection === subName) m.subsection = ''; });
+        save(); renderSectionsList(); renderMain();
+      });
+      subList.appendChild(subRow);
+    });
+
+    // add new subsection
+    const newSubInput = block.querySelector('.new-subsection-input');
+    const addSub = () => {
+      const val = newSubInput.value.trim();
+      if (!val) return;
+      if (sec.subsections.includes(val)) { showAlert('That subsection already exists here.'); return; }
+      sec.subsections.push(val);
+      newSubInput.value = '';
+      save(); renderSectionsList(); renderMain();
+    };
+    block.querySelector('.add-subsection-btn').addEventListener('click', addSub);
+    newSubInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addSub(); });
+
+    list.appendChild(block);
+  });
+}
+document.getElementById('manageSectionsBtn').addEventListener('click', () => {
+  if (!currentChar) return;
+  renderSectionsList();
+  document.getElementById('sectionsOverlay').classList.add('show');
+});
+document.getElementById('closeSectionsBtn').addEventListener('click', () => {
+  document.getElementById('sectionsOverlay').classList.remove('show');
+});
+document.getElementById('sectionsOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'sectionsOverlay') document.getElementById('sectionsOverlay').classList.remove('show');
+});
+
+function renderColumnsList() {
+  const list = document.getElementById('columnsList');
+  const order = state.columnOrder;
+  list.innerHTML = '';
+  order.forEach((key, i) => {
+    const row = document.createElement('div');
+    row.className = 'sec-row';
+    row.innerHTML = `
+      <button class="small icon up-btn" ${i===0?'disabled':''}>↑</button>
+      <button class="small icon down-btn" ${i===order.length-1?'disabled':''}>↓</button>
+      <span style="flex:1;font-size:13px">${escapeHtml(COLUMN_DEFS[key] || key)}</span>
+    `;
+    row.querySelector('.up-btn').addEventListener('click', () => {
+      if (i === 0) return;
+      [order[i-1], order[i]] = [order[i], order[i-1]];
+      save(); renderColumnsList(); renderMain();
+    });
+    row.querySelector('.down-btn').addEventListener('click', () => {
+      if (i === order.length-1) return;
+      [order[i+1], order[i]] = [order[i], order[i+1]];
+      save(); renderColumnsList(); renderMain();
+    });
+    list.appendChild(row);
+  });
+  const actionsRow = document.createElement('div');
+  actionsRow.className = 'sec-row';
+  actionsRow.style.opacity = '0.5';
+  actionsRow.innerHTML = `<span style="flex:1;font-size:13px;margin-left:56px">Actions (always last)</span>`;
+  list.appendChild(actionsRow);
+}
+document.getElementById('manageColumnsBtn').addEventListener('click', () => {
+  if (!currentChar) return;
+  renderColumnsList();
+  document.getElementById('columnsOverlay').classList.add('show');
+});
+document.getElementById('closeColumnsBtn').addEventListener('click', () => {
+  document.getElementById('columnsOverlay').classList.remove('show');
+});
+document.getElementById('columnsOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'columnsOverlay') document.getElementById('columnsOverlay').classList.remove('show');
+});
+document.getElementById('resetColumnsBtn').addEventListener('click', () => {
+  state.columnOrder = [...DEFAULT_COLUMN_ORDER];
+  save(); renderColumnsList(); renderMain();
+});
+
+document.getElementById('addSectionBtn').addEventListener('click', () => {
+  const input = document.getElementById('newSectionInput');
+  const name = input.value.trim();
+  if (!name) return;
+  const secs = state.characters[currentChar].sections || (state.characters[currentChar].sections = []);
+  if (secs.some(s => s.name === name)) { showAlert('That section already exists.'); return; }
+  secs.push({ name, subsections: [] });
+  input.value = '';
+  save();
+  renderSectionsList();
+  renderMain();
+});
+document.getElementById('newSectionInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('addSectionBtn').click();
+});
+
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const root = document.documentElement;
+  const current = root.getAttribute('data-theme');
+  root.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tekken8-frame-data.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      if (!imported.characters) throw new Error('Invalid file format');
+      Object.entries(imported.characters).forEach(([name, data]) => {
+        const normSections = (data.sections || []).map(s =>
+          typeof s === 'string' ? { name: s, subsections: [] } : { name: s.name, subsections: Array.isArray(s.subsections) ? s.subsections : [] }
+        );
+        if (!state.characters[name]) {
+          state.characters[name] = { moves: [], sections: normSections };
+        } else {
+          const existingNames = new Set(state.characters[name].sections.map(s => s.name));
+          normSections.forEach(s => { if (!existingNames.has(s.name)) state.characters[name].sections.push(s); });
+        }
+        const existingIds = new Set(state.characters[name].moves.map(m => m.id));
+        state.characters[name].moves.push(...(data.moves || [])
+          .filter(m => !m.id || !existingIds.has(m.id)) // re-importing the same file doesn't duplicate moves
+          .map(m => {
+            const { level, ...rest } = m;
+            return { ...rest, id: m.id || uid(), subsection: m.subsection || '', levels: Array.isArray(m.levels) ? m.levels : (level ? [level] : []) };
+          }));
+        delete state.deleted[name];
+      });
+      normalizeState();
+      save();
+      renderSidebar();
+      renderMain();
+      showAlert('Import complete.');
+    } catch (err) {
+      showAlert('Could not read that file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// Init
+load();
+const firstChar = Object.keys(state.characters).sort()[0];
+if (firstChar) currentChar = firstChar;
+renderSidebar();
+renderMain();
+initGistSync();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
