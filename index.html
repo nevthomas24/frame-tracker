@@ -292,7 +292,7 @@
   table {
     border-collapse: collapse;
     width: 100%;
-    min-width: 900px;
+    min-width: 100%;
     font-size: calc(13px * var(--fs, 1));
   }
   thead th {
@@ -318,6 +318,18 @@
     white-space: nowrap;
   }
   tbody td.wrap { white-space: normal; max-width: 260px; }
+  .more-btn { display: none; font-weight: 700; min-width: 40px; }
+  td.notation { cursor: pointer; }
+  @media (max-width: 1100px) {
+    .inline-actions { display: none !important; }
+    .more-btn { display: inline-block; }
+    tbody td, thead th { padding-left: 7px; padding-right: 7px; }
+    tbody td.wrap { max-width: 170px; min-width: 90px; }
+    tr.section-row td, tr.subsection-row td { white-space: normal; }
+    .section-row-flex { flex-wrap: wrap; }
+  }
+  .sheet-actions { display: flex; flex-direction: column; gap: 8px; }
+  .sheet-actions button { text-align: left; padding: 12px 14px; font-size: calc(15px * var(--fs, 1)); }
   .notes-clamp {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -629,6 +641,14 @@
   .add-section-row input { flex: 1; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  body.sidebar-collapsed nav.sidebar { display: none; }
+  .char-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .char-bar .cur-char { font-weight: 700; font-size: calc(16px * var(--fs, 1)); }
+  .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .sidebar-head .lbl { font-size: calc(11px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); font-weight: 600; }
+  .col-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: calc(12px * var(--fs, 1)); color: var(--text-dim); cursor: pointer; }
+  .col-toggle input { width: 18px; height: 18px; }
+  .sec-row.col-hidden > span { opacity: .45; text-decoration: line-through; }
   @media (max-width: 760px) {
     .layout { flex-direction: column; }
     nav.sidebar {
@@ -661,6 +681,10 @@
 
 <div class="layout">
   <nav class="sidebar">
+    <div class="sidebar-head">
+      <span class="lbl">Characters</span>
+      <button type="button" class="small ghost" id="collapseSidebarBtn" title="Hide this panel">◀ Hide</button>
+    </div>
     <div class="add-char">
       <input type="text" id="newCharInput" placeholder="Add character…">
       <button class="primary small" id="addCharBtn">Add</button>
@@ -670,10 +694,14 @@
   </nav>
 
   <main>
+    <div class="char-bar" id="charBar" style="display:none">
+      <button type="button" class="small" id="expandSidebarBtn" title="Show characters">☰ Characters</button>
+      <span class="cur-char" id="curCharName"></span>
+    </div>
     <div class="toolbar-actions" id="toolbarActions" style="display:none">
       <input type="text" id="searchInput" placeholder="🔍 Search notation, name, notes…">
       <button id="manageSectionsBtn" class="sections-cta">✏️ Add / Edit Sections</button>
-      <button id="manageColumnsBtn" class="sections-cta">↔ Reorder Columns</button>
+      <button id="manageColumnsBtn" class="sections-cta">↔ Columns</button>
       <button id="pasteTableBtn" class="sections-cta">📋 Paste from wiki</button>
       <button id="finderBtn" class="sections-cta">🎯 Punish finder</button>
       <button class="primary" id="addMoveBtn">+ Add Move</button>
@@ -778,8 +806,8 @@
 
 <div class="overlay" id="columnsOverlay">
   <div class="modal">
-    <h2>Reorder Columns</h2>
-    <div class="hint">Use ↑↓ to change the order columns appear in the table. "Actions" always stays last.</div>
+    <h2>Columns</h2>
+    <div class="hint">Untick a column to hide it on this device (handy on the iPad in portrait). Use ↑↓ to change the order. Notation and Actions always show.</div>
     <div class="sections-list" id="columnsList"></div>
     <div class="modal-actions">
       <button class="ghost" id="resetColumnsBtn">Reset to default</button>
@@ -860,6 +888,20 @@
       <button class="ghost" id="finderClose">Close</button>
       <div></div>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="rowSheet">
+  <div class="modal" style="max-width:360px">
+    <h2 id="rowSheetTitle" class="notation"></h2>
+    <div class="sheet-actions">
+      <button type="button" data-act="edit-btn">✏️ Edit</button>
+      <button type="button" data-act="move-up-btn">↑ Move up</button>
+      <button type="button" data-act="move-down-btn">↓ Move down</button>
+      <button type="button" data-act="dup-btn">⧉ Duplicate</button>
+      <button type="button" data-act="row-del-btn" style="color:var(--bad)">🗑 Delete</button>
+    </div>
+    <div class="modal-actions"><button class="ghost" id="rowSheetClose">Cancel</button><div></div></div>
   </div>
 </div>
 
@@ -1309,6 +1351,7 @@ function renderSidebar() {
       currentChar = name;
       renderSidebar();
       renderMain();
+      if (window.innerWidth < 1200) setSidebarCollapsed(true);
     });
     div.querySelector('.del-btn').addEventListener('click', async () => {
       const ok = await showConfirm(`Delete "${name}" and all logged moves? This can't be undone.`);
@@ -1377,6 +1420,8 @@ function renderStats() {
 }
 
 function renderMain() {
+  if (!currentChar && document.body.classList.contains('sidebar-collapsed')) document.body.classList.remove('sidebar-collapsed');
+  if (typeof updateCharBar === 'function' && document.getElementById('charBar')) updateCharBar();
   const toolbar = document.getElementById('toolbar');
   const toolbarActions = document.getElementById('toolbarActions');
   const area = document.getElementById('tableArea');
@@ -1462,7 +1507,7 @@ function renderMain() {
     return;
   }
 
-  const cols = [...state.columnOrder.map(k => [k, COLUMN_DEFS[k]]), ['actions', '']];
+  const cols = [...visibleColumns().map(k => [k, COLUMN_DEFS[k]]), ['actions', '']];
 
   // group moves by section (preserving order), then within each section by subsection
   // (only sections that actually define subsections get that extra nesting)
@@ -1490,7 +1535,7 @@ function renderMain() {
   const manualOrder = !sortKey; // reordering only makes sense on the natural (unsorted) order
   const cellHtml = (key, m) => {
     switch (key) {
-      case 'notation': return `<td class="notation">${escapeHtml(m.notation)}</td>`;
+      case 'notation': return `<td class="notation" title="Tap to edit">${escapeHtml(m.notation)}</td>`;
       case 'name': return `<td>${escapeHtml(m.name||'—')}</td>`;
       case 'level': return `<td>${levelSeqBadges(m.levels)}</td>`;
       case 'damage': return `<td>${escapeHtml(m.damage||'—')}</td>`;
@@ -1507,8 +1552,8 @@ function renderMain() {
     }
   };
   const renderMoveRow = (m, isFirst, isLast) => {
-    const dataCells = state.columnOrder.map(key => cellHtml(key, m)).join('');
-    const actionsCell = `<td><div class="row-actions">
+    const dataCells = visibleColumns().map(key => cellHtml(key, m)).join('');
+    const actionsCell = `<td class="actions-cell"><button type="button" class="small icon more-btn" title="Move options">⋯</button><div class="row-actions inline-actions">
           ${manualOrder ? `<button class="small icon move-up-btn" title="Move up" ${isFirst?'disabled':''}>↑</button>
           <button class="small icon move-down-btn" title="Move down" ${isLast?'disabled':''}>↓</button>` : ''}
           <button class="small icon edit-btn" title="Edit move">✏️</button>
@@ -1615,6 +1660,12 @@ function renderMain() {
       if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
       renderMain();
     });
+  });
+  area.querySelectorAll('td.notation').forEach(td => {
+    td.addEventListener('click', () => { const id = td.closest('tr').dataset.id; openModal(currentMoves().find(m => m.id === id)); });
+  });
+  area.querySelectorAll('.more-btn').forEach(btn => {
+    btn.addEventListener('click', () => openRowSheet(btn.closest('tr')));
   });
   area.querySelectorAll('.notes-clamp').forEach(el => {
     el.addEventListener('click', () => el.classList.toggle('open'));
@@ -2057,7 +2108,14 @@ function renderColumnsList() {
       <button class="small icon up-btn" ${i===0?'disabled':''}>↑</button>
       <button class="small icon down-btn" ${i===order.length-1?'disabled':''}>↓</button>
       <span style="flex:1;font-size: calc(13px * var(--fs, 1))">${escapeHtml(COLUMN_DEFS[key] || key)}</span>
+      ${key === 'notation' ? '' : `<label class="col-toggle"><input type="checkbox" ${hiddenCols.has(key) ? '' : 'checked'}> Show</label>`}
     `;
+    if (hiddenCols.has(key)) row.classList.add('col-hidden');
+    const cb = row.querySelector('.col-toggle input');
+    if (cb) cb.addEventListener('change', () => {
+      if (cb.checked) hiddenCols.delete(key); else hiddenCols.add(key);
+      saveHiddenCols(); renderColumnsList(); renderMain();
+    });
     row.querySelector('.up-btn').addEventListener('click', () => {
       if (i === 0) return;
       [order[i-1], order[i]] = [order[i], order[i-1]];
@@ -2089,6 +2147,7 @@ document.getElementById('columnsOverlay').addEventListener('click', (e) => {
 });
 document.getElementById('resetColumnsBtn').addEventListener('click', () => {
   state.columnOrder = [...DEFAULT_COLUMN_ORDER];
+  hiddenCols.clear(); saveHiddenCols();
   save(); renderColumnsList(); renderMain();
 });
 
@@ -2425,7 +2484,7 @@ document.getElementById('finderClose').addEventListener('click', () => document.
 document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
 
 /* ---------- Text size (saved per device: phone and iPad can differ) ---------- */
-const APP_VERSION = 'v3 · 8 Oct';
+const APP_VERSION = 'v4 · 8 Oct';
 const FS_KEY = 'tekken8-font-scale';
 const FS_STEPS = [0.9, 1, 1.15, 1.3, 1.45, 1.6];
 function applyFontScale(v) {
@@ -2453,12 +2512,58 @@ document.getElementById('fsUp').addEventListener('click', () => stepFontScale(1)
 applyFontScale(currentFontScale());
 document.getElementById('appVersion').textContent = APP_VERSION;
 
+/* ---------- Side panel + column visibility (both saved per device) ---------- */
+const SIDEBAR_KEY = 'tekken8-sidebar-collapsed';
+const HIDDEN_COLS_KEY = 'tekken8-hidden-columns';
+const hiddenCols = new Set();
+try { (JSON.parse(localStorage.getItem(HIDDEN_COLS_KEY) || '[]') || []).forEach(k => hiddenCols.add(k)); } catch (e) {}
+function saveHiddenCols() { try { localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify([...hiddenCols])); } catch (e) {} }
+function visibleColumns() { return state.columnOrder.filter(k => k === 'notation' || !hiddenCols.has(k)); }
+function setSidebarCollapsed(on) {
+  // never hide the panel when there's no character to show instead
+  const collapse = !!on && !!currentChar;
+  document.body.classList.toggle('sidebar-collapsed', collapse);
+  try { localStorage.setItem(SIDEBAR_KEY, collapse ? '1' : '0'); } catch (e) {}
+  updateCharBar();
+}
+function updateCharBar() {
+  const collapsed = document.body.classList.contains('sidebar-collapsed');
+  document.getElementById('charBar').style.display = collapsed && currentChar ? 'flex' : 'none';
+  document.getElementById('curCharName').textContent = currentChar || '';
+}
+document.getElementById('collapseSidebarBtn').addEventListener('click', () => setSidebarCollapsed(true));
+document.getElementById('expandSidebarBtn').addEventListener('click', () => setSidebarCollapsed(false));
+
+/* ---------- ⋯ row options (narrow screens) ---------- */
+let sheetRowId = null;
+function openRowSheet(tr) {
+  sheetRowId = tr.dataset.id;
+  document.getElementById('rowSheetTitle').textContent = tr.querySelector('td.notation').textContent;
+  document.querySelectorAll('#rowSheet [data-act]').forEach(b => {
+    const target = tr.querySelector('.' + b.dataset.act);
+    b.style.display = target ? '' : 'none';           // ↑↓ don't exist while sorted by a column
+    b.disabled = !!(target && target.disabled);         // first/last can't move further
+  });
+  document.getElementById('rowSheet').classList.add('show');
+}
+document.querySelectorAll('#rowSheet [data-act]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.getElementById('rowSheet').classList.remove('show');
+    const tr = document.querySelector(`#tableArea tr[data-id="${sheetRowId}"]`);
+    const target = tr && tr.querySelector('.' + b.dataset.act);
+    if (target) target.click();
+  });
+});
+document.getElementById('rowSheetClose').addEventListener('click', () => document.getElementById('rowSheet').classList.remove('show'));
+document.getElementById('rowSheet').addEventListener('click', (e) => { if (e.target.id === 'rowSheet') e.currentTarget.classList.remove('show'); });
+
 // Init
 load();
 const firstChar = Object.keys(state.characters).sort()[0];
 if (firstChar) currentChar = firstChar;
 renderSidebar();
 renderMain();
+try { setSidebarCollapsed(localStorage.getItem(SIDEBAR_KEY) === '1'); } catch (e) { updateCharBar(); }
 initGistSync();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {}));
