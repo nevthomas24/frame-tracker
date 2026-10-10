@@ -309,6 +309,11 @@
     user-select: none;
   }
   thead th:hover { color: var(--text); }
+  thead th { -webkit-touch-callout: none; -webkit-user-select: none; position: relative; }
+  thead th.col-dragging { background: var(--bg-elev-2); color: var(--text); outline: 2px solid var(--accent-2); outline-offset: -2px; border-radius: 6px; }
+  thead th.col-drop-before { box-shadow: inset 3px 0 0 var(--accent-2); }
+  thead th.col-drop-after { box-shadow: inset -3px 0 0 var(--accent-2); }
+  body.col-drag-active, body.col-drag-active * { cursor: grabbing !important; }
   .sort-hint { opacity: 0.4; font-size: calc(9px * var(--fs, 1)); }
   thead th:hover .sort-hint { opacity: 0.9; }
   tbody td {
@@ -902,6 +907,22 @@
       <button type="button" data-act="row-del-btn" style="color:var(--bad)">🗑 Delete</button>
     </div>
     <div class="modal-actions"><button class="ghost" id="rowSheetClose">Cancel</button><div></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="colSheet">
+  <div class="modal" style="max-width:360px">
+    <h2 id="colSheetTitle"></h2>
+    <div class="sheet-actions">
+      <button type="button" data-colact="sort-asc">▲ Sort low → high</button>
+      <button type="button" data-colact="sort-desc">▼ Sort high → low</button>
+      <button type="button" data-colact="sort-clear">✕ Clear sort</button>
+      <button type="button" data-colact="left">◀ Move column left</button>
+      <button type="button" data-colact="right">Move column right ▶</button>
+      <button type="button" data-colact="hide">🙈 Hide column</button>
+    </div>
+    <div class="hint" style="margin-top:10px">Tip: press and hold a header, then drag it sideways to move it.</div>
+    <div class="modal-actions"><button class="ghost" id="colSheetClose">Cancel</button><div></div></div>
   </div>
 </div>
 
@@ -1654,12 +1675,13 @@ function renderMain() {
   });
 
   area.querySelectorAll('thead th').forEach(th => {
+    const key = th.dataset.key;
+    if (key === 'actions') return;
     th.addEventListener('click', () => {
-      const key = th.dataset.key;
-      if (key === 'actions' || key === 'tags') return;
-      if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
-      renderMain();
+      if (Date.now() < colDrag.suppressClickUntil) return; // a drag just ended here
+      openColSheet(key);
     });
+    attachHeaderDrag(th);
   });
   area.querySelectorAll('td.notation').forEach(td => {
     td.addEventListener('click', () => { const id = td.closest('tr').dataset.id; openModal(currentMoves().find(m => m.id === id)); });
@@ -2484,7 +2506,7 @@ document.getElementById('finderClose').addEventListener('click', () => document.
 document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
 
 /* ---------- Text size (saved per device: phone and iPad can differ) ---------- */
-const APP_VERSION = 'v4 · 8 Oct';
+const APP_VERSION = 'v5 · 10 Oct';
 const FS_KEY = 'tekken8-font-scale';
 const FS_STEPS = [0.9, 1, 1.15, 1.3, 1.45, 1.6];
 function applyFontScale(v) {
@@ -2556,6 +2578,131 @@ document.querySelectorAll('#rowSheet [data-act]').forEach(b => {
 });
 document.getElementById('rowSheetClose').addEventListener('click', () => document.getElementById('rowSheet').classList.remove('show'));
 document.getElementById('rowSheet').addEventListener('click', (e) => { if (e.target.id === 'rowSheet') e.currentTarget.classList.remove('show'); });
+
+/* ---------- Column headers: tap for a menu, press-and-hold to drag ---------- */
+function moveColumn(dragKey, targetKey, after) {
+  if (!dragKey || dragKey === targetKey) return;
+  const order = state.columnOrder;
+  const from = order.indexOf(dragKey);
+  if (from < 0) return;
+  order.splice(from, 1);
+  let idx;
+  if (targetKey === 'actions' || order.indexOf(targetKey) < 0) {
+    // dropped on the actions column: place after the last visible column
+    const vis = visibleColumns();
+    idx = vis.length ? order.indexOf(vis[vis.length - 1]) + 1 : order.length;
+  } else {
+    idx = order.indexOf(targetKey) + (after ? 1 : 0);
+  }
+  order.splice(idx, 0, dragKey);
+  save(); renderMain();
+}
+
+let colSheetKey = null;
+function openColSheet(key) {
+  colSheetKey = key;
+  const vis = visibleColumns();
+  const i = vis.indexOf(key);
+  const sortable = key !== 'tags';
+  document.getElementById('colSheetTitle').textContent = COLUMN_DEFS[key] || key;
+  const show = (act, on, disabled) => {
+    const b = document.querySelector(`#colSheet [data-colact="${act}"]`);
+    b.style.display = on ? '' : 'none';
+    b.disabled = !!disabled;
+  };
+  show('sort-asc', sortable, sortKey === key && sortDir === 1);
+  show('sort-desc', sortable, sortKey === key && sortDir === -1);
+  show('sort-clear', sortKey === key);
+  show('left', true, i <= 0);
+  show('right', true, i < 0 || i >= vis.length - 1);
+  show('hide', key !== 'notation');
+  document.getElementById('colSheet').classList.add('show');
+}
+document.querySelectorAll('#colSheet [data-colact]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.getElementById('colSheet').classList.remove('show');
+    const key = colSheetKey;
+    const vis = visibleColumns();
+    const i = vis.indexOf(key);
+    switch (b.dataset.colact) {
+      case 'sort-asc': sortKey = key; sortDir = 1; renderMain(); break;
+      case 'sort-desc': sortKey = key; sortDir = -1; renderMain(); break;
+      case 'sort-clear': sortKey = null; sortDir = 1; renderMain(); break;
+      case 'left': if (i > 0) moveColumn(key, vis[i - 1], false); break;
+      case 'right': if (i >= 0 && i < vis.length - 1) moveColumn(key, vis[i + 1], true); break;
+      case 'hide': hiddenCols.add(key); saveHiddenCols(); renderMain(); break;
+    }
+  });
+});
+document.getElementById('colSheetClose').addEventListener('click', () => document.getElementById('colSheet').classList.remove('show'));
+document.getElementById('colSheet').addEventListener('click', (e) => { if (e.target.id === 'colSheet') e.currentTarget.classList.remove('show'); });
+
+const colDrag = { timer: null, active: false, key: null, th: null, pointerId: null, startX: 0, startY: 0, mouse: false, target: null, after: false, suppressClickUntil: 0 };
+const HOLD_MS = 300, MOVE_SLOP = 8;
+function clearDropMarks() {
+  document.querySelectorAll('thead th.col-drop-before, thead th.col-drop-after').forEach(t => t.classList.remove('col-drop-before', 'col-drop-after'));
+}
+function endColDrag(drop) {
+  clearTimeout(colDrag.timer); colDrag.timer = null;
+  const wasActive = colDrag.active;
+  const { key, target, after } = colDrag;
+  if (colDrag.th) colDrag.th.classList.remove('col-dragging');
+  clearDropMarks();
+  document.body.classList.remove('col-drag-active');
+  colDrag.active = false; colDrag.key = null; colDrag.th = null; colDrag.pointerId = null; colDrag.target = null;
+  if (wasActive) {
+    colDrag.suppressClickUntil = Date.now() + 400;
+    if (drop && target) moveColumn(key, target, after);
+  }
+}
+function startColDrag() {
+  if (!colDrag.th) return;
+  colDrag.active = true;
+  colDrag.th.classList.add('col-dragging');
+  document.body.classList.add('col-drag-active');
+}
+function attachHeaderDrag(th) {
+  th.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press shouldn't open a menu
+  th.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    endColDrag(false);
+    colDrag.key = th.dataset.key; colDrag.th = th; colDrag.pointerId = e.pointerId;
+    colDrag.startX = e.clientX; colDrag.startY = e.clientY;
+    colDrag.mouse = e.pointerType === 'mouse';
+    // touch/pen: hold still to pick the column up; mouse: just start dragging
+    if (!colDrag.mouse) colDrag.timer = setTimeout(startColDrag, HOLD_MS);
+  });
+}
+document.addEventListener('pointermove', (e) => {
+  if (colDrag.pointerId !== e.pointerId || !colDrag.th) return;
+  if (!colDrag.active) {
+    const moved = Math.hypot(e.clientX - colDrag.startX, e.clientY - colDrag.startY) > MOVE_SLOP;
+    if (!moved) return;
+    if (colDrag.mouse) startColDrag();
+    else { endColDrag(false); return; } // finger moved before the hold: let the table scroll
+  }
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const over = el && el.closest('#tableArea thead th');
+  clearDropMarks();
+  colDrag.target = null;
+  if (over && over !== colDrag.th) {
+    const r = over.getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    over.classList.add(after ? 'col-drop-after' : 'col-drop-before');
+    colDrag.target = over.dataset.key; colDrag.after = after;
+  }
+  // nudge the table sideways when dragging near its edges
+  const wrap = colDrag.th.closest('.table-wrap');
+  if (wrap) {
+    const wr = wrap.getBoundingClientRect();
+    if (e.clientX < wr.left + 40) wrap.scrollLeft -= 14;
+    else if (e.clientX > wr.right - 40) wrap.scrollLeft += 14;
+  }
+});
+document.addEventListener('pointerup', (e) => { if (colDrag.pointerId === e.pointerId) endColDrag(true); });
+document.addEventListener('pointercancel', (e) => { if (colDrag.pointerId === e.pointerId) endColDrag(false); });
+// iPad: once a column is picked up, stop the finger from scrolling the page instead
+document.addEventListener('touchmove', (e) => { if (colDrag.active) e.preventDefault(); }, { passive: false });
 
 // Init
 load();
