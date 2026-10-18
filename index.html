@@ -407,10 +407,12 @@
   .prop-homing { background: var(--accent-2); color: #fff; letter-spacing: .02em; }
   .level-gap { display: inline-block; width: 6px; }
   .prop-wall { background: #2fae5a; color: #fff; letter-spacing: .02em; }
+  .prop-tornado { background: #e0457b; color: #fff; letter-spacing: .02em; }
   .tag-choice.prop-choice { border-color: var(--prop-c); color: var(--prop-c); }
   .tag-choice.prop-choice.selected { background: var(--prop-c); color: #fff; }
   .prop-choice[data-prop="Homing"] { --prop-c: var(--accent-2); }
   .prop-choice[data-prop="Wall"] { --prop-c: #2fae5a; }
+  .prop-choice[data-prop="Tornado"] { --prop-c: #e0457b; }
   .row-actions { display: flex; gap: 4px; }
   .empty-state {
     text-align: center;
@@ -730,6 +732,7 @@
         <option value="Unblockable">Unblockable</option>
         <option value="Homing">Homing</option>
         <option value="Wall">Wall</option>
+        <option value="Tornado">Tornado</option>
       </select>
       <select id="punishFilter">
         <option value="">Any block adv.</option>
@@ -755,7 +758,7 @@
       <div class="field"><label>Notation *</label><input id="f_notation" placeholder="e.g. df+2"></div>
       <div class="field"><label>Move name</label><input id="f_name" placeholder="e.g. Demolition Man"></div>
       <div class="field full">
-        <label>Hit properties — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string). Homing and Wall switch on or off for the move.</label>
+        <label>Hit properties — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string). Homing, Wall and Tornado switch on or off for the move.</label>
         <div class="level-seq" id="levelSeq"></div>
         <div class="tag-picker" id="levelPicker">
           <div class="tag-choice level-choice" data-level="High">High</div>
@@ -765,6 +768,7 @@
           <div class="tag-choice level-choice" data-level="Unblockable">Unblockable</div>
           <div class="tag-choice prop-choice" data-prop="Homing" role="button" aria-pressed="false">Homing</div>
           <div class="tag-choice prop-choice" data-prop="Wall" role="button" aria-pressed="false" title="Wall splat, wall break, balcony break">Wall</div>
+          <div class="tag-choice prop-choice" data-prop="Tornado" role="button" aria-pressed="false" title="Tornado (screw): extends combos">Tornado</div>
         </div>
       </div>
       <div class="field"><label>Section</label>
@@ -1002,6 +1006,11 @@ function normalizeState() {
         // one-time: moves tagged as wall splats/breaks get the Wall property
         if ((m.tags || []).some(t => /wall|balcony/i.test(t)) && !m.props.includes('Wall')) m.props.push('Wall');
         m.wallChecked = true;
+      }
+      if (!m.tornadoChecked) {
+        // one-time: moves tagged as tornados get the Tornado property
+        if ((m.tags || []).some(t => /tornado|screw/i.test(t)) && !m.props.includes('Tornado')) m.props.push('Tornado');
+        m.tornadoChecked = true;
       }
       delete m.level;
     });
@@ -1327,6 +1336,7 @@ function levelBadge(level) {
 const PROP_INFO = {
   Homing: { cls: 'prop-homing', abbr: 'HOM' },
   Wall:   { cls: 'prop-wall',   abbr: 'WALL' },
+  Tornado: { cls: 'prop-tornado', abbr: 'TRN' },
 };
 function propBadges(props) {
   return Object.keys(PROP_INFO).filter(p => (props || []).includes(p))
@@ -2561,7 +2571,7 @@ document.getElementById('finderClose').addEventListener('click', () => document.
 document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
 
 /* ---------- Text size (saved per device: phone and iPad can differ) ---------- */
-const APP_VERSION = 'v7 · 18 Oct';
+const APP_VERSION = 'v8 · 18 Oct';
 const FS_KEY = 'tekken8-font-scale';
 const FS_STEPS = [0.9, 1, 1.15, 1.3, 1.45, 1.6];
 function applyFontScale(v) {
