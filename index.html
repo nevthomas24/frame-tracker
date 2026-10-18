@@ -404,6 +404,10 @@
   .level-low  { background: rgba(168,85,247,0.15); color: #b085f5; }
   .level-specialmid { background: rgba(62,207,106,0.15); color: var(--good); }
   .level-unblockable { background: rgba(255,92,92,0.15); color: var(--bad); }
+  .prop-homing { background: var(--accent-2); color: #fff; letter-spacing: .02em; }
+  .level-gap { display: inline-block; width: 6px; }
+  .tag-choice.prop-choice { border-color: var(--accent-2); color: var(--accent-2); }
+  .tag-choice.prop-choice.selected { background: var(--accent-2); color: #fff; }
   .row-actions { display: flex; gap: 4px; }
   .empty-state {
     text-align: center;
@@ -721,6 +725,7 @@
         <option value="Low">Low</option>
         <option value="Special Mid">Special Mid</option>
         <option value="Unblockable">Unblockable</option>
+        <option value="Homing">Homing</option>
       </select>
       <select id="punishFilter">
         <option value="">Any block adv.</option>
@@ -746,7 +751,7 @@
       <div class="field"><label>Notation *</label><input id="f_notation" placeholder="e.g. df+2"></div>
       <div class="field"><label>Move name</label><input id="f_name" placeholder="e.g. Demolition Man"></div>
       <div class="field full">
-        <label>Hit level(s) — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string)</label>
+        <label>Hit properties — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string). Homing switches on or off for the move.</label>
         <div class="level-seq" id="levelSeq"></div>
         <div class="tag-picker" id="levelPicker">
           <div class="tag-choice level-choice" data-level="High">High</div>
@@ -754,6 +759,7 @@
           <div class="tag-choice level-choice" data-level="Low">Low</div>
           <div class="tag-choice level-choice" data-level="Special Mid">Special Mid</div>
           <div class="tag-choice level-choice" data-level="Unblockable">Unblockable</div>
+          <div class="tag-choice prop-choice" data-prop="Homing" role="button" aria-pressed="false">Homing</div>
         </div>
       </div>
       <div class="field"><label>Section</label>
@@ -947,6 +953,7 @@ let sortKey = null;
 let sortDir = 1;
 let selectedTags = new Set();
 let selectedLevels = [];
+let selectedProps = [];
 let collapsed = new Set();
 function defaultSections() {
   return [
@@ -985,6 +992,7 @@ function normalizeState() {
       if (typeof m.section !== 'string') m.section = '';
       if (typeof m.subsection !== 'string') m.subsection = '';
       if (!Array.isArray(m.levels)) m.levels = m.level ? [m.level] : [];
+      if (!Array.isArray(m.props)) m.props = (m.tags || []).includes('Homing') ? ['Homing'] : [];
       delete m.level;
     });
   });
@@ -1305,9 +1313,11 @@ function levelBadge(level) {
   const info = LEVEL_INFO[level];
   return `<span class="level-pill ${info.cls}" title="${escapeHtml(level)}">${info.abbr}</span>`;
 }
-function levelSeqBadges(levels) {
-  if (!levels || levels.length === 0) return '—';
-  return levels.map(l => levelBadge(l)).join('<span class="level-arrow">›</span>');
+function levelSeqBadges(levels, props) {
+  const seq = (levels || []).map(l => levelBadge(l)).join('<span class="level-arrow">›</span>');
+  const homing = (props || []).includes('Homing') ? '<span class="level-pill prop-homing" title="Homing">HOM</span>' : '';
+  if (!seq && !homing) return '—';
+  return seq + (seq && homing ? '<span class="level-gap"></span>' : '') + homing;
 }
 
 // Frame values come in many shapes: "-9", "+3", "−14" (typographic minus from wikis),
@@ -1478,7 +1488,7 @@ function renderMain() {
     );
   }
   if (tagF) moves = moves.filter(m => (m.tags||[]).includes(tagF));
-  if (levelF) moves = moves.filter(m => (m.levels||[]).includes(levelF));
+  if (levelF) moves = moves.filter(m => levelF === 'Homing' ? (m.props||[]).includes('Homing') : (m.levels||[]).includes(levelF));
   if (sectionF) {
     const knownSectionNames = (state.characters[currentChar].sections || []).map(s => s.name);
     if (sectionF === UNCATEGORIZED) {
@@ -1558,7 +1568,7 @@ function renderMain() {
     switch (key) {
       case 'notation': return `<td class="notation" title="Tap to edit">${escapeHtml(m.notation)}</td>`;
       case 'name': return `<td>${escapeHtml(m.name||'—')}</td>`;
-      case 'level': return `<td>${levelSeqBadges(m.levels)}</td>`;
+      case 'level': return `<td>${levelSeqBadges(m.levels, m.props)}</td>`;
       case 'damage': return `<td>${escapeHtml(m.damage||'—')}</td>`;
       case 'startup': return `<td>${escapeHtml(m.startup||'—')}</td>`;
       case 'block': return `<td>${framePill(m.block, true)}</td>`;
@@ -1718,7 +1728,7 @@ function renderMain() {
     btn.addEventListener('click', (e) => {
       const id = e.target.closest('tr').dataset.id;
       const orig = currentMoves().find(m => m.id === id);
-      const copy = {...orig, id: uid(), notation: orig.notation + ' (copy)', tags: [...(orig.tags||[])], levels: [...(orig.levels||[])]};
+      const copy = {...orig, id: uid(), notation: orig.notation + ' (copy)', tags: [...(orig.tags||[])], levels: [...(orig.levels||[])], props: [...(orig.props||[])]};
       state.characters[currentChar].moves.push(copy);
       save(); renderMain(); renderSidebar();
     });
@@ -1756,15 +1766,24 @@ function buildTagPicker() {
 
 function buildLevelSeq() {
   const seq = document.getElementById('levelSeq');
+  const homing = selectedProps.includes('Homing');
+  document.querySelectorAll('#levelPicker .prop-choice').forEach(el => {
+    const on = selectedProps.includes(el.dataset.prop);
+    el.classList.toggle('selected', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  const homingChip = homing ? '<span class="level-gap"></span><span class="level-chip"><span class="level-pill prop-homing">HOM</span><button type="button" class="level-chip-del prop-del" title="Remove homing">✕</button></span>' : '';
   if (selectedLevels.length === 0) {
-    seq.innerHTML = `<span class="placeholder">No hits added yet — tap a level below for each hit, in order.</span>`;
+    seq.innerHTML = (homing ? homingChip : '') + `<span class="placeholder">${homing ? ' ' : ''}No hits added yet — tap a level below for each hit, in order.</span>`;
+    wirePropDel(seq);
     return;
   }
   seq.innerHTML = selectedLevels.map((lvl, i) => {
     const info = LEVEL_INFO[lvl] || { cls: '', abbr: lvl };
     return `<span class="level-chip"><span class="level-pill ${info.cls}">${escapeHtml(info.abbr)}</span><button type="button" class="level-chip-del" data-idx="${i}" title="Remove this hit">✕</button></span>`;
-  }).join('<span class="level-arrow">›</span>');
-  seq.querySelectorAll('.level-chip-del').forEach(btn => {
+  }).join('<span class="level-arrow">›</span>') + homingChip;
+  wirePropDel(seq);
+  seq.querySelectorAll('.level-chip-del:not(.prop-del)').forEach(btn => {
     btn.addEventListener('click', () => {
       selectedLevels.splice(parseInt(btn.dataset.idx, 10), 1);
       buildLevelSeq();
@@ -1772,6 +1791,12 @@ function buildLevelSeq() {
   });
 }
 
+function wirePropDel(seq) {
+  seq.querySelectorAll('.prop-del').forEach(btn => btn.addEventListener('click', () => {
+    selectedProps = selectedProps.filter(p => p !== 'Homing');
+    buildLevelSeq();
+  }));
+}
 function refreshSubsectionOptions(selectedSub) {
   const secSel = document.getElementById('f_section');
   const subSel = document.getElementById('f_subsection');
@@ -1799,6 +1824,7 @@ function openModal(move, defaultSection, defaultSubsection) {
   document.getElementById('f_notation').value = move?.notation || '';
   document.getElementById('f_name').value = move?.name || '';
   selectedLevels = move?.levels ? [...move.levels] : [];
+  selectedProps = move?.props ? [...move.props] : [];
   buildLevelSeq();
   const secSel = document.getElementById('f_section');
   secSel.innerHTML = `<option value="">${UNCATEGORIZED}</option>` +
@@ -1832,6 +1858,7 @@ function saveMove(keepOpen) {
     notation,
     name: document.getElementById('f_name').value.trim(),
     levels: [...selectedLevels],
+    props: [...selectedProps],
     section: document.getElementById('f_section').value,
     subsection: document.getElementById('f_subsection').value,
     damage: document.getElementById('f_damage').value.trim(),
@@ -1880,6 +1907,7 @@ function resetFormForNextMove() {
   selectedTags = new Set();
   buildTagPicker();
   selectedLevels = [];
+  selectedProps = [];
   buildLevelSeq();
   document.getElementById('f_notation').focus();
 }
@@ -1944,6 +1972,13 @@ document.getElementById('addMoveBtn').addEventListener('click', () => {
   openModal(null, def, defSub);
 });
 document.getElementById('f_section').addEventListener('change', () => refreshSubsectionOptions());
+document.querySelectorAll('#levelPicker .prop-choice').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = btn.dataset.prop;
+    selectedProps = selectedProps.includes(p) ? selectedProps.filter(x => x !== p) : [...selectedProps, p];
+    buildLevelSeq();
+  });
+});
 document.querySelectorAll('#levelPicker .level-choice').forEach(btn => {
   btn.addEventListener('click', () => {
     selectedLevels.push(btn.dataset.level);
@@ -2506,7 +2541,7 @@ document.getElementById('finderClose').addEventListener('click', () => document.
 document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
 
 /* ---------- Text size (saved per device: phone and iPad can differ) ---------- */
-const APP_VERSION = 'v5 · 10 Oct';
+const APP_VERSION = 'v6 · 18 Oct';
 const FS_KEY = 'tekken8-font-scale';
 const FS_STEPS = [0.9, 1, 1.15, 1.3, 1.45, 1.6];
 function applyFontScale(v) {
