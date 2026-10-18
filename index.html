@@ -406,8 +406,11 @@
   .level-unblockable { background: rgba(255,92,92,0.15); color: var(--bad); }
   .prop-homing { background: var(--accent-2); color: #fff; letter-spacing: .02em; }
   .level-gap { display: inline-block; width: 6px; }
-  .tag-choice.prop-choice { border-color: var(--accent-2); color: var(--accent-2); }
-  .tag-choice.prop-choice.selected { background: var(--accent-2); color: #fff; }
+  .prop-wall { background: #2fae5a; color: #fff; letter-spacing: .02em; }
+  .tag-choice.prop-choice { border-color: var(--prop-c); color: var(--prop-c); }
+  .tag-choice.prop-choice.selected { background: var(--prop-c); color: #fff; }
+  .prop-choice[data-prop="Homing"] { --prop-c: var(--accent-2); }
+  .prop-choice[data-prop="Wall"] { --prop-c: #2fae5a; }
   .row-actions { display: flex; gap: 4px; }
   .empty-state {
     text-align: center;
@@ -726,6 +729,7 @@
         <option value="Special Mid">Special Mid</option>
         <option value="Unblockable">Unblockable</option>
         <option value="Homing">Homing</option>
+        <option value="Wall">Wall</option>
       </select>
       <select id="punishFilter">
         <option value="">Any block adv.</option>
@@ -751,7 +755,7 @@
       <div class="field"><label>Notation *</label><input id="f_notation" placeholder="e.g. df+2"></div>
       <div class="field"><label>Move name</label><input id="f_name" placeholder="e.g. Demolition Man"></div>
       <div class="field full">
-        <label>Hit properties — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string). Homing switches on or off for the move.</label>
+        <label>Hit properties — tap each hit in order (e.g. High → Mid → Mid for a 3-hit string). Homing and Wall switch on or off for the move.</label>
         <div class="level-seq" id="levelSeq"></div>
         <div class="tag-picker" id="levelPicker">
           <div class="tag-choice level-choice" data-level="High">High</div>
@@ -760,6 +764,7 @@
           <div class="tag-choice level-choice" data-level="Special Mid">Special Mid</div>
           <div class="tag-choice level-choice" data-level="Unblockable">Unblockable</div>
           <div class="tag-choice prop-choice" data-prop="Homing" role="button" aria-pressed="false">Homing</div>
+          <div class="tag-choice prop-choice" data-prop="Wall" role="button" aria-pressed="false" title="Wall splat, wall break, balcony break">Wall</div>
         </div>
       </div>
       <div class="field"><label>Section</label>
@@ -993,6 +998,11 @@ function normalizeState() {
       if (typeof m.subsection !== 'string') m.subsection = '';
       if (!Array.isArray(m.levels)) m.levels = m.level ? [m.level] : [];
       if (!Array.isArray(m.props)) m.props = (m.tags || []).includes('Homing') ? ['Homing'] : [];
+      if (!m.wallChecked) {
+        // one-time: moves tagged as wall splats/breaks get the Wall property
+        if ((m.tags || []).some(t => /wall|balcony/i.test(t)) && !m.props.includes('Wall')) m.props.push('Wall');
+        m.wallChecked = true;
+      }
       delete m.level;
     });
   });
@@ -1313,11 +1323,20 @@ function levelBadge(level) {
   const info = LEVEL_INFO[level];
   return `<span class="level-pill ${info.cls}" title="${escapeHtml(level)}">${info.abbr}</span>`;
 }
+// Move-wide hit properties, in display order. Adding one = one line here + a picker chip + a colour.
+const PROP_INFO = {
+  Homing: { cls: 'prop-homing', abbr: 'HOM' },
+  Wall:   { cls: 'prop-wall',   abbr: 'WALL' },
+};
+function propBadges(props) {
+  return Object.keys(PROP_INFO).filter(p => (props || []).includes(p))
+    .map(p => `<span class="level-pill ${PROP_INFO[p].cls}" title="${p}">${PROP_INFO[p].abbr}</span>`).join(' ');
+}
 function levelSeqBadges(levels, props) {
   const seq = (levels || []).map(l => levelBadge(l)).join('<span class="level-arrow">›</span>');
-  const homing = (props || []).includes('Homing') ? '<span class="level-pill prop-homing" title="Homing">HOM</span>' : '';
-  if (!seq && !homing) return '—';
-  return seq + (seq && homing ? '<span class="level-gap"></span>' : '') + homing;
+  const extra = propBadges(props);
+  if (!seq && !extra) return '—';
+  return seq + (seq && extra ? '<span class="level-gap"></span>' : '') + extra;
 }
 
 // Frame values come in many shapes: "-9", "+3", "−14" (typographic minus from wikis),
@@ -1488,7 +1507,7 @@ function renderMain() {
     );
   }
   if (tagF) moves = moves.filter(m => (m.tags||[]).includes(tagF));
-  if (levelF) moves = moves.filter(m => levelF === 'Homing' ? (m.props||[]).includes('Homing') : (m.levels||[]).includes(levelF));
+  if (levelF) moves = moves.filter(m => PROP_INFO[levelF] ? (m.props||[]).includes(levelF) : (m.levels||[]).includes(levelF));
   if (sectionF) {
     const knownSectionNames = (state.characters[currentChar].sections || []).map(s => s.name);
     if (sectionF === UNCATEGORIZED) {
@@ -1766,15 +1785,16 @@ function buildTagPicker() {
 
 function buildLevelSeq() {
   const seq = document.getElementById('levelSeq');
-  const homing = selectedProps.includes('Homing');
+  const hasProps = selectedProps.some(p => PROP_INFO[p]);
   document.querySelectorAll('#levelPicker .prop-choice').forEach(el => {
     const on = selectedProps.includes(el.dataset.prop);
     el.classList.toggle('selected', on);
     el.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  const homingChip = homing ? '<span class="level-gap"></span><span class="level-chip"><span class="level-pill prop-homing">HOM</span><button type="button" class="level-chip-del prop-del" title="Remove homing">✕</button></span>' : '';
+  const homingChip = hasProps ? '<span class="level-gap"></span>' + Object.keys(PROP_INFO).filter(p => selectedProps.includes(p)).map(p =>
+    `<span class="level-chip"><span class="level-pill ${PROP_INFO[p].cls}">${PROP_INFO[p].abbr}</span><button type="button" class="level-chip-del prop-del" data-prop="${p}" title="Remove ${p}">✕</button></span>`).join(' ') : '';
   if (selectedLevels.length === 0) {
-    seq.innerHTML = (homing ? homingChip : '') + `<span class="placeholder">${homing ? ' ' : ''}No hits added yet — tap a level below for each hit, in order.</span>`;
+    seq.innerHTML = homingChip + `<span class="placeholder">${hasProps ? ' ' : ''}No hits added yet — tap a level below for each hit, in order.</span>`;
     wirePropDel(seq);
     return;
   }
@@ -1793,7 +1813,7 @@ function buildLevelSeq() {
 
 function wirePropDel(seq) {
   seq.querySelectorAll('.prop-del').forEach(btn => btn.addEventListener('click', () => {
-    selectedProps = selectedProps.filter(p => p !== 'Homing');
+    selectedProps = selectedProps.filter(p => p !== btn.dataset.prop);
     buildLevelSeq();
   }));
 }
@@ -2541,7 +2561,7 @@ document.getElementById('finderClose').addEventListener('click', () => document.
 document.getElementById('finderOverlay').addEventListener('click', (e) => { if (e.target.id === 'finderOverlay') e.currentTarget.classList.remove('show'); });
 
 /* ---------- Text size (saved per device: phone and iPad can differ) ---------- */
-const APP_VERSION = 'v6 · 18 Oct';
+const APP_VERSION = 'v7 · 18 Oct';
 const FS_KEY = 'tekken8-font-scale';
 const FS_STEPS = [0.9, 1, 1.15, 1.3, 1.45, 1.6];
 function applyFontScale(v) {
